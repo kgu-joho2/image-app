@@ -1,0 +1,11 @@
+services:
+  image-app:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - backend/.env # backendディレクトリ内の.envファイルを読み込む
+    volumes:
+      # デバッグモードでのコード変更を反映させるため（開発時のみ推奨）
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend

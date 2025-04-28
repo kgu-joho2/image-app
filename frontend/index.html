@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gemini Image Chat</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="chat-box" id="chat-box">
+        <!-- Chat messages will appear here -->
+        <div class="message assistant">
+          <p>生成したい画像のイメージを入力してください。</p>
+        </div>
+      </div>
+      <div class="input-area">
+        <!-- Image Upload Button -->
+        <label for="image-upload" class="upload-button">📎</label>
+        <input
+          type="file"
+          id="image-upload"
+          accept="image/*"
+          style="display: none"
+        />
+
+        <!-- Image Preview Area -->
+        <div
+          id="image-preview-area"
+          style="display: none; margin-right: 10px; position: relative"
+        >
+          <img
+            id="image-preview"
+            src="#"
+            alt="Image Preview"
+            style="height: 40px; width: auto; border-radius: 4px"
+          />
+          <button id="clear-image-button" class="clear-image-btn">×</button>
+        </div>
+
+        <textarea
+          id="user-input"
+          placeholder="イメージを入力..."
+          rows="1"
+        ></textarea>
+        <button id="send-button">送信</button>
+      </div>
+
+      <!-- Add New Chat button INSIDE the container, after input-area -->
+      <button id="new-chat-button" style="display: none">新しいチャット</button>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

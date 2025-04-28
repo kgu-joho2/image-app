@@ -1,0 +1,233 @@
+body {
+  font-family: sans-serif;
+  margin: 0;
+  background-color: #f0f8ff; /* AliceBlue - light blue background */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.chat-container {
+  width: 80%;
+  max-width: 600px;
+  height: 90vh;
+  max-height: 800px;
+  background-color: #ffffff; /* White chat area */
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-box {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 20px;
+  border-bottom: 1px solid #e0f0ff; /* Lighter blue border */
+}
+
+.message {
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  border-radius: 15px;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.message.user {
+  background-color: #d0eaff; /* Light blue for user messages */
+  color: #333;
+  align-self: flex-end;
+  margin-left: auto; /* Push user messages to the right */
+}
+
+/* Add style for images within user messages */
+.message.user img {
+  max-width: 200px; /* Limit width */
+  max-height: 150px; /* Limit height */
+  height: auto; /* Maintain aspect ratio */
+  border-radius: 8px;
+  margin-top: 10px;
+  display: block;
+}
+
+.message.assistant {
+  background-color: #e6f7ff; /* Very light blue for assistant messages */
+  color: #333;
+  align-self: flex-start;
+  margin-right: auto; /* Keep assistant messages to the left */
+}
+
+.message.assistant img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  /* margin-top: 10px; */ /* Margin handled by container now */
+  display: block; /* Ensure image takes its own line */
+}
+
+/* Container for image and download button */
+.image-container {
+  position: relative; /* For positioning the button */
+  display: inline-block; /* Fit content size */
+  margin-top: 10px; /* Add margin to the container */
+}
+
+/* Style for the download button */
+.download-button {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent black */
+  color: white;
+  border: none;
+  border-radius: 50%; /* Make it circular */
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  line-height: 30px; /* Center icon vertically */
+  text-align: center;
+  cursor: pointer;
+  text-decoration: none; /* Remove underline from link */
+  opacity: 0.7; /* Slightly transparent */
+  transition: opacity 0.3s ease;
+}
+
+.download-button:hover {
+  opacity: 1; /* Fully visible on hover */
+}
+
+.message.error {
+  background-color: #ffebee; /* Light pink for errors */
+  color: #c62828; /* Dark red text */
+  align-self: flex-start;
+  margin-right: auto;
+}
+
+.input-area {
+  display: flex;
+  padding: 15px;
+  background-color: #ffffff; /* White input area */
+  align-items: flex-end; /* Align items to the bottom */
+}
+
+/* Style the textarea */
+#user-input {
+  flex-grow: 1;
+  padding: 10px 15px; /* Adjust padding if needed */
+  border: 1px solid #cce0ff; /* Light blue border */
+  border-radius: 20px;
+  margin-right: 10px;
+  outline: none;
+  font-family: inherit; /* Inherit font from body */
+  font-size: 1em; /* Match surrounding elements */
+  resize: none; /* Disable manual resizing */
+  overflow-y: hidden; /* Hide scrollbar initially, let JS handle height */
+  line-height: 1.4; /* Adjust for better multiline spacing */
+  min-height: 20px; /* Corresponds roughly to padding + line-height for one line */
+  box-sizing: border-box; /* Include padding and border in height */
+}
+
+#send-button {
+  padding: 10px 20px;
+  background-color: #007bff; /* Primary blue */
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+#send-button:hover {
+  background-color: #0056b3; /* Darker blue on hover */
+}
+
+.upload-button {
+  padding: 8px 12px;
+  background-color: #e9ecef;
+  color: #495057;
+  border: 1px solid #ced4da;
+  border-radius: 20px;
+  cursor: pointer;
+  margin-right: 10px;
+  font-size: 1.2em;
+  line-height: 1;
+  display: inline-flex; /* Align icon vertically */
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+.upload-button:hover {
+  background-color: #dee2e6;
+}
+
+#image-preview-area {
+  /* Styles already applied inline, but can add more here */
+}
+
+.clear-image-btn {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  line-height: 16px; /* Adjust for vertical centering */
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  display: flex; /* Use flexbox for centering */
+  align-items: center; /* Center vertically */
+  justify-content: center; /* Center horizontally */
+}
+
+.input-area.disabled {
+  /* These might not be needed anymore if we hide the whole area */
+  /* opacity: 0.6; */
+  /* pointer-events: none; */
+}
+
+#new-chat-button {
+  display: none; /* Initially hidden, controlled by JS */
+  padding: 12px 20px; /* Adjust padding for better look */
+  margin: 0 15px 15px 15px; /* Match input area horizontal padding and add bottom margin */
+  font-size: 1em;
+  background-color: #28a745; /* Green color */
+  color: white;
+  border: none;
+  border-radius: 20px; /* Match send button */
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  text-align: center;
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+#new-chat-button:hover {
+  background-color: #218838; /* Darker green on hover */
+}
+
+/* Optional: Add a thinking indicator */
+.message.thinking p::after {
+  content: "...";
+  display: inline-block;
+  animation: thinking 1.5s infinite;
+}
+
+@keyframes thinking {
+  0% {
+    content: ".";
+  }
+  33% {
+    content: "..";
+  }
+  66% {
+    content: "...";
+  }
+}
