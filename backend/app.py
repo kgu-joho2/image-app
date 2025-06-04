@@ -1,6 +1,6 @@
 import os
 import io
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response
 from dotenv import load_dotenv
 import google.generativeai as genai
 import pkg_resources # Import pkg_resources
@@ -10,9 +10,22 @@ from PIL import Image
 import base64
 import traceback # Keep for error logging
 
+# Import TTS service
+from tts_service import TTSService
+
 load_dotenv()
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
+
+# Initialize TTS service with error handling
+tts_service = None
+try:
+    from tts_service import TTSService
+    tts_service = TTSService()
+    print("TTS service initialized successfully")
+except Exception as e:
+    print(f"Warning: TTS service initialization failed: {e}")
+    print("TTS features will not be available, but image generation will still work")
 
 # Print the installed version
 try:
@@ -32,6 +45,133 @@ genai.configure(api_key=api_key)
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
+
+# TTS Static Files
+@app.route('/tts/')
+def tts_index():
+    return send_from_directory('../frontend/tts', 'index.html')
+
+@app.route('/tts/<path:filename>')
+def tts_static(filename):
+    return send_from_directory('../frontend/tts', filename)
+
+# TTS API Endpoints
+@app.route('/api/tts/extract-text', methods=['POST'])
+def extract_text():
+    """文書からテキストを抽出"""
+    if not tts_service:
+        return jsonify({"success": False, "error": "TTS機能が利用できません。システム管理者にお問い合わせください。"}), 503
+    
+    try:
+        if 'file' not in request.files:
+            return jsonify({"success": False, "error": "ファイルが選択されていません"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"success": False, "error": "ファイルが選択されていません"}), 400
+        
+        # Read file content
+        file_content = file.read()
+        file_type = file.content_type
+        filename = file.filename
+        
+        # Extract text using TTS service
+        result = tts_service.extract_text_from_file(file_content, file_type, filename)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Text extraction endpoint error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"テキスト抽出エラー: {str(e)}"}), 500
+
+@app.route('/api/tts/summarize', methods=['POST'])
+def summarize_text():
+    """テキストを要約"""
+    if not tts_service:
+        return jsonify({"success": False, "error": "TTS機能が利用できません。システム管理者にお問い合わせください。"}), 503
+        
+    try:
+        data = request.get_json()
+        text = data.get('text')
+        speaker_mode = data.get('speaker_mode', 'single')  # デフォルトは単一話者
+        
+        if not text:
+            return jsonify({"success": False, "error": "要約するテキストが指定されていません"}), 400
+        
+        # Summarize using TTS service
+        result = tts_service.summarize_text(text, speaker_mode)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"Summarization endpoint error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"要約エラー: {str(e)}"}), 500
+
+@app.route('/api/tts/preview-voice', methods=['POST'])
+def preview_voice():
+    """音声プレビュー生成"""
+    if not tts_service:
+        return jsonify({"success": False, "error": "TTS service is not available"}), 503
+    
+    try:
+        data = request.get_json()
+        voice = data.get('voice', 'Kore')
+        text = data.get('text', 'こんにちは。これは音声のプレビューです。')
+        style = data.get('style', '')
+        rate = data.get('rate', 1.0)
+        
+        result = tts_service.preview_voice(voice, text, style, rate)
+        
+        if result.get("success"):
+            # JSON形式でレスポンスを返す
+            return jsonify({
+                "success": True,
+                "audio_data": result["audio_data"],
+                "format": result["format"]
+            })
+        else:
+            return jsonify({"success": False, "error": result.get("error", "音声プレビューに失敗しました")}), 500
+            
+    except Exception as e:
+        print(f"Preview voice error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"音声プレビューエラー: {str(e)}"}), 500
+
+@app.route('/api/tts/generate', methods=['POST'])
+def generate_speech():
+    """音声生成"""
+    if not tts_service:
+        return jsonify({"success": False, "error": "TTS service is not available"}), 503
+    
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        voice_settings = data.get('voice_settings', {})
+        speaker_mode = data.get('speaker_mode', 'single')
+        style = data.get('style', '')
+        rate = data.get('rate', 1.0)
+        
+        if not text:
+            return jsonify({"success": False, "error": "テキストが指定されていません"}), 400
+        
+        result = tts_service.generate_speech(text, voice_settings, speaker_mode, style, rate)
+        
+        if result.get("success"):
+            # JSON形式でレスポンスを返す
+            return jsonify({
+                "success": True,
+                "audio_data": result["audio_data"],
+                "format": result["format"]
+            })
+        else:
+            return jsonify({"success": False, "error": result.get("error", "音声生成に失敗しました")}), 500
+            
+    except Exception as e:
+        print(f"Generate speech error: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"音声生成エラー: {str(e)}"}), 500
 
 @app.route('/generate', methods=['POST'])
 def generate_image():

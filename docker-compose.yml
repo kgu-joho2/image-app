@@ -5,7 +5,20 @@ services:
       - "5000:5000"
     env_file:
       - backend/.env # backendディレクトリ内の.envファイルを読み込む
+    environment:
+      # TTS機能用の追加環境変数（オプション）
+      - DOCUMENT_AI_LOCATION=${DOCUMENT_AI_LOCATION:-us}
+      - GOOGLE_CLOUD_PROJECT_ID=${GOOGLE_CLOUD_PROJECT_ID:-}
+      - DOCUMENT_AI_PROCESSOR_ID=${DOCUMENT_AI_PROCESSOR_ID:-}
     volumes:
       # デバッグモードでのコード変更を反映させるため（開発時のみ推奨）
       - ./backend:/app/backend
       - ./frontend:/app/frontend
+      # Google Cloud認証ファイル用（オプション）
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/dev/null}:/app/credentials.json:ro
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

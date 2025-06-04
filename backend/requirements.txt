@@ -1,4 +1,23 @@
-Flask
-google-generativeai>=0.5.0
-python-dotenv
-Pillow 
+Flask==2.3.3
+google-generativeai>=0.8.5
+python-dotenv==1.0.0
+Pillow==10.0.1
+# TTS機能用ライブラリ
+google-genai>=0.4.0
+google-cloud-documentai>=2.20.1
+google-cloud-vision>=3.4.5
+PyPDF2>=3.0.1
+python-docx>=0.8.11
+python-pptx>=0.6.23
+SpeechRecognition>=3.10.0
+gunicorn==21.2.0
+
+# システム依存関係（apt-getでインストール済み）
+# libpoppler-cpp-dev
+# libgl1-mesa-glx
+# libglib2.0-0
+# libsm6
+# libxext6
+# libxrender-dev
+# libgomp1
+# libsndfile1 
