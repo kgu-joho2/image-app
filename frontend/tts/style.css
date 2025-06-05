@@ -8,7 +8,7 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #f0f8ff; /* AliceBlue - 画像生成アプリと統一 */
   min-height: 100vh;
   color: #333;
   line-height: 1.6;
@@ -16,62 +16,32 @@ body {
 
 /* Container */
 .tts-container {
-  max-width: 1200px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 20px;
-  min-height: 100vh;
-}
-
-/* Navigation */
-.navigation {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 16px 24px;
-  margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.nav-links {
-  display: flex;
-  gap: 20px;
-}
-
-.nav-link {
-  color: white;
-  text-decoration: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  font-weight: 500;
-}
-
-.nav-link:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.nav-link.active {
-  background: rgba(255, 255, 255, 0.2);
-  font-weight: 600;
 }
 
 /* Header */
 .header {
   text-align: center;
-  color: white;
-  margin-bottom: 32px;
+  margin-bottom: 2rem;
+  padding: 2rem 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .header h1 {
+  color: #007bff; /* プライマリブルー - 画像生成アプリと統一 */
+  margin-bottom: 0.5rem;
   font-size: 2.5rem;
   font-weight: 700;
-  margin-bottom: 8px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .header p {
+  color: #666;
   font-size: 1.1rem;
-  opacity: 0.9;
 }
 
 /* Mode Selection */
@@ -86,17 +56,18 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.95); /* 白背景に変更 */
   padding: 12px 20px;
   border-radius: 25px;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: white;
-  border: 2px solid transparent;
+  color: #333; /* テキスト色も変更 */
+  border: 2px solid #cce0ff; /* ライトブルーボーダー */
 }
 
 .mode-option:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(208, 234, 255, 0.3); /* d0eaff hover */
+  border-color: #007bff;
 }
 
 .mode-option input[type="radio"] {
@@ -108,18 +79,76 @@ body {
 }
 
 .mode-option:has(input[type="radio"]:checked) {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: #d0eaff; /* ライトブルー選択状態 */
+  border-color: #007bff;
+  color: #007bff;
 }
 
 /* Input Sections */
 .input-section {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.95); /* 画像生成アプリと統一 */
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Text Input */
+textarea {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #cce0ff; /* ライトブルーボーダー - 画像生成アプリと統一 */
+  border-radius: 12px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  resize: vertical;
+  transition: all 0.3s ease;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #007bff; /* プライマリブルー */
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* Select Elements */
+select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #cce0ff; /* ライトブルーボーダー */
+  border-radius: 12px;
+  background: white;
+  font-family: inherit;
+  font-size: 1rem;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* Input Elements */
+input[type="text"] {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #cce0ff; /* ライトブルーボーダー */
+  border-radius: 12px;
+  background: white;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
 /* Speaker Mode */
@@ -151,34 +180,15 @@ body {
 }
 
 .speaker-option:has(input[type="radio"]:checked) {
-  background: #e3f2fd;
-  border-color: #2196f3;
-  color: #1976d2;
+  background: #d0eaff; /* ライトブルー選択状態 */
+  border-color: #007bff;
+  color: #007bff;
   font-weight: 600;
 }
 
 /* Text Area */
 .text-area-container {
   position: relative;
-}
-
-#text-input {
-  width: 100%;
-  min-height: 200px;
-  padding: 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  font-size: 16px;
-  font-family: inherit;
-  resize: vertical;
-  transition: border-color 0.3s ease;
-  background: white;
-}
-
-#text-input:focus {
-  outline: none;
-  border-color: #2196f3;
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
 }
 
 .character-count {
@@ -194,19 +204,25 @@ body {
 }
 
 .upload-zone {
-  border: 2px dashed #ccc;
-  border-radius: 12px;
-  padding: 40px 20px;
+  border: 2px dashed #cce0ff; /* ライトブルーボーダー - 画像生成アプリと統一 */
+  border-radius: 16px;
+  padding: 3rem;
   text-align: center;
-  transition: all 0.3s ease;
   cursor: pointer;
-  background: #fafafa;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
 }
 
-.upload-zone:hover,
+.upload-zone:hover {
+  border-color: #007bff; /* プライマリブルー */
+  background: rgba(208, 234, 255, 0.2); /* d0eaff with opacity */
+  transform: translateY(-2px);
+}
+
 .upload-zone.dragover {
-  border-color: #2196f3;
-  background: #f0f8ff;
+  border-color: #007bff;
+  background: rgba(208, 234, 255, 0.3);
+  transform: scale(1.02);
 }
 
 .upload-content {
@@ -309,7 +325,7 @@ body {
 
 /* Voice Settings */
 .voice-settings {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.95); /* 画像生成アプリと統一 */
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 24px;
@@ -377,43 +393,49 @@ body {
 
 /* Buttons */
 .btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 20px; /* 画像生成アプリと統一 */
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
   text-decoration: none;
+  gap: 8px;
+  min-height: 48px;
 }
 
 .btn-primary {
-  background: #2196f3;
+  background-color: #007bff; /* プライマリブルー - 画像生成アプリと統一 */
   color: white;
 }
 
-.btn-primary:hover {
-  background: #1976d2;
-  transform: translateY(-1px);
+.btn-primary:hover:not(:disabled) {
+  background-color: #0056b3; /* 画像生成アプリと統一 */
+  transform: translateY(-2px);
 }
 
 .btn-secondary {
-  background: #6c757d;
-  color: white;
+  background-color: #e9ecef; /* 画像生成アプリと統一 */
+  color: #495057;
+  border: 1px solid #ced4da;
 }
 
-.btn-secondary:hover {
-  background: #5a6268;
+.btn-secondary:hover:not(:disabled) {
+  background-color: #dee2e6; /* 画像生成アプリと統一 */
+  transform: translateY(-2px);
 }
 
 .btn-preview {
-  background: #ff9800;
-  color: white;
-  font-size: 12px;
-  padding: 6px 12px;
+  background-color: #d0eaff; /* ライトブルー - 画像生成アプリと統一 */
+  color: #007bff;
+  border: 1px solid #cce0ff;
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  border-radius: 16px;
 }
 
 .btn-preview:hover {
@@ -460,23 +482,29 @@ body {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 16px;
   padding: 24px;
-  margin-bottom: 24px;
+  margin-top: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  text-align: center;
 }
 
 .audio-section h3 {
-  margin-bottom: 20px;
-  color: #333;
+  color: #007bff; /* プライマリブルー */
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+  font-weight: 600;
 }
 
 .audio-player {
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 .audio-player audio {
   width: 100%;
   max-width: 500px;
+  background: #f8f9fa;
+  border-radius: 12px;
 }
 
 .audio-actions {
@@ -570,10 +598,6 @@ body {
     align-items: center;
   }
 
-  .nav-links {
-    justify-content: center;
-  }
-
   .audio-actions {
     flex-direction: column;
     align-items: center;
@@ -632,7 +656,7 @@ body {
 .extracted-content-editor {
   width: 100%;
   padding: 1rem;
-  border: 2px solid #e0e0e0;
+  border: 2px solid #cce0ff; /* ライトブルーボーダー - 画像生成アプリと統一 */
   border-radius: 12px;
   background: white;
   font-family: inherit;
@@ -645,6 +669,6 @@ body {
 
 .extracted-content-editor:focus {
   outline: none;
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+  border-color: #007bff; /* プライマリブルー */
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }

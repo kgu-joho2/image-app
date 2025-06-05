@@ -8,14 +8,6 @@
   </head>
   <body>
     <div class="tts-container">
-      <!-- ナビゲーション -->
-      <nav class="navigation">
-        <div class="nav-links">
-          <a href="../index.html" class="nav-link">画像生成</a>
-          <a href="index.html" class="nav-link active">TTS</a>
-        </div>
-      </nav>
-
       <div class="header">
         <h1>Text-to-Speech</h1>
         <p>テキストや文書を自然な音声に変換</p>
@@ -118,14 +110,7 @@
             <div class="setting-group">
               <label for="voice-select">音声選択</label>
               <select id="voice-select">
-                <option value="Kore">Kore (女性, 中音域)</option>
-                <option value="Puck">Puck (男性)</option>
-                <option value="Charon">Charon (男性)</option>
-                <option value="Fenrir">Fenrir (男性)</option>
-                <option value="Aoede">Aoede (女性)</option>
-                <option value="Leda">Leda (女性)</option>
-                <option value="Orus">Orus (男性)</option>
-                <option value="Zephyr">Zephyr (女性)</option>
+                <!-- JavaScriptで動的に生成されます -->
               </select>
               <button id="preview-voice" class="btn btn-preview">
                 プレビュー
@@ -142,10 +127,7 @@
             <div class="speaker-config">
               <h4>話者A</h4>
               <select id="voice-select-a">
-                <option value="Kore">Kore (女性, 中音域)</option>
-                <option value="Aoede">Aoede (女性)</option>
-                <option value="Leda">Leda (女性)</option>
-                <option value="Zephyr">Zephyr (女性)</option>
+                <!-- JavaScriptで動的に生成されます -->
               </select>
               <button class="btn btn-preview" onclick="previewVoice('A')">
                 プレビュー
@@ -154,10 +136,7 @@
             <div class="speaker-config">
               <h4>話者B</h4>
               <select id="voice-select-b">
-                <option value="Puck">Puck (男性)</option>
-                <option value="Charon">Charon (男性)</option>
-                <option value="Fenrir">Fenrir (男性)</option>
-                <option value="Orus">Orus (男性)</option>
+                <!-- JavaScriptで動的に生成されます -->
               </select>
               <button class="btn btn-preview" onclick="previewVoice('B')">
                 プレビュー

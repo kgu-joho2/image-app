@@ -83,6 +83,9 @@ class TTSApp {
 
     // Status elements
     this.processingStatus = document.getElementById("processing-status");
+
+    // 音声選択肢を充実させる
+    this.populateVoiceOptions();
   }
 
   attachEventListeners() {
@@ -331,6 +334,80 @@ class TTSApp {
       existingControls.remove();
     }
 
+    // 音声選択肢を特徴と共に定義
+    const voiceOptions = {
+      female: [
+        { value: "Kore", label: "Kore - しっかりとした、自信に満ちた女性音声" },
+        { value: "Aoede", label: "Aoede - 爽やかで自然な、風のような女性音声" },
+        { value: "Leda", label: "Leda - 若々しくエネルギッシュな女性音声" },
+        { value: "Zephyr", label: "Zephyr - 明るく陽気な女性音声" },
+        { value: "Autonoe", label: "Autonoe - 明るく楽観的な女性音声" },
+        {
+          value: "Callirrhoe",
+          label: "Callirrhoe - のんびりとリラックスした女性音声",
+        },
+        { value: "Despina", label: "Despina - なめらかで流暢な女性音声" },
+        { value: "Erinome", label: "Erinome - クリアで正確な女性音声" },
+        { value: "Gacrux", label: "Gacrux - 成熟した経験豊富な女性音声" },
+        { value: "Laomedeia", label: "Laomedeia - 元気で活発な女性音声" },
+        {
+          value: "Pulcherrima",
+          label: "Pulcherrima - 表現豊かで積極的な女性音声",
+        },
+        { value: "Sulafat", label: "Sulafat - 温かく歓迎的な女性音声" },
+        { value: "Vindemiatrix", label: "Vindemiatrix - 優しく親切な女性音声" },
+        { value: "Achernar", label: "Achernar - ソフトで優しい女性音声" },
+      ],
+      male: [
+        { value: "Puck", label: "Puck - 明るくエネルギッシュな男性音声" },
+        { value: "Charon", label: "Charon - 情報的でクリアな男性音声" },
+        {
+          value: "Fenrir",
+          label: "Fenrir - 興奮しやすくダイナミックな男性音声",
+        },
+        { value: "Orus", label: "Orus - しっかりとした決断力のある男性音声" },
+        {
+          value: "Achird",
+          label: "Achird - フレンドリーで親しみやすい男性音声",
+        },
+        { value: "Algenib", label: "Algenib - 重厚感のあるざらついた男性音声" },
+        { value: "Algieba", label: "Algieba - なめらかで心地よい男性音声" },
+        { value: "Alnilam", label: "Alnilam - しっかりとした力強い男性音声" },
+        {
+          value: "Enceladus",
+          label: "Enceladus - 息づかいが感じられるソフトな男性音声",
+        },
+        { value: "Iapetus", label: "Iapetus - クリアで明瞭な男性音声" },
+        {
+          value: "Rasalgethi",
+          label: "Rasalgethi - 情報的でプロフェッショナルな男性音声",
+        },
+        {
+          value: "Sadachbia",
+          label: "Sadachbia - 活気に満ちたアニメーションのような男性音声",
+        },
+        {
+          value: "Sadaltager",
+          label: "Sadaltager - 知識豊富で権威的な男性音声",
+        },
+        { value: "Schedar", label: "Schedar - 均等でバランスの取れた男性音声" },
+        { value: "Umbriel", label: "Umbriel - のんびりと穏やかな男性音声" },
+        {
+          value: "Zubenelgenubi",
+          label: "Zubenelgenubi - カジュアルで会話的な男性音声",
+        },
+      ],
+    };
+
+    // 音声選択のHTMLを生成
+    const generateVoiceOptions = (voices) => {
+      return voices
+        .map(
+          (voice) => `<option value="${voice.value}">${voice.label}</option>`
+        )
+        .join("");
+    };
+
     // 新しいコントロールパネルを作成 - テキスト入力時と同じレイアウトに統一
     const controlsHtml = `
       <div id="extracted-content-controls" class="voice-settings">
@@ -357,14 +434,12 @@ class TTSApp {
             <div class="setting-group">
               <label for="extracted-voice-select">音声選択</label>
               <select id="extracted-voice-select">
-                <option value="Kore">Kore (女性, 中音域)</option>
-                <option value="Puck">Puck (男性)</option>
-                <option value="Charon">Charon (男性)</option>
-                <option value="Fenrir">Fenrir (男性)</option>
-                <option value="Aoede">Aoede (女性)</option>
-                <option value="Leda">Leda (女性)</option>
-                <option value="Orus">Orus (男性)</option>
-                <option value="Zephyr">Zephyr (女性)</option>
+                <optgroup label="女性音声">
+                  ${generateVoiceOptions(voiceOptions.female)}
+                </optgroup>
+                <optgroup label="男性音声">
+                  ${generateVoiceOptions(voiceOptions.male)}
+                </optgroup>
               </select>
               <button id="preview-extracted-voice" class="btn btn-preview">
                 プレビュー
@@ -377,10 +452,9 @@ class TTSApp {
             <div class="speaker-config">
               <h4>話者A</h4>
               <select id="extracted-voice-select-a">
-                <option value="Kore">Kore (女性, 中音域)</option>
-                <option value="Aoede">Aoede (女性)</option>
-                <option value="Leda">Leda (女性)</option>
-                <option value="Zephyr">Zephyr (女性)</option>
+                <optgroup label="女性音声">
+                  ${generateVoiceOptions(voiceOptions.female)}
+                </optgroup>
               </select>
               <button class="btn btn-preview" onclick="previewExtractedVoice('A')">
                 プレビュー
@@ -389,10 +463,9 @@ class TTSApp {
             <div class="speaker-config">
               <h4>話者B</h4>
               <select id="extracted-voice-select-b">
-                <option value="Puck">Puck (男性)</option>
-                <option value="Charon">Charon (男性)</option>
-                <option value="Fenrir">Fenrir (男性)</option>
-                <option value="Orus">Orus (男性)</option>
+                <optgroup label="男性音声">
+                  ${generateVoiceOptions(voiceOptions.male)}
+                </optgroup>
               </select>
               <button class="btn btn-preview" onclick="previewExtractedVoice('B')">
                 プレビュー
@@ -1054,6 +1127,200 @@ class TTSApp {
       button.disabled = false;
       btnText.style.display = "inline";
       btnLoading.style.display = "none";
+    }
+  }
+
+  populateVoiceOptions() {
+    // 音声選択肢を特徴と共に定義
+    const voiceOptions = {
+      female: [
+        { value: "Kore", label: "Kore - しっかりとした、自信に満ちた女性音声" },
+        { value: "Aoede", label: "Aoede - 爽やかで自然な、風のような女性音声" },
+        { value: "Leda", label: "Leda - 若々しくエネルギッシュな女性音声" },
+        { value: "Zephyr", label: "Zephyr - 明るく陽気な女性音声" },
+        { value: "Autonoe", label: "Autonoe - 明るく楽観的な女性音声" },
+        {
+          value: "Callirrhoe",
+          label: "Callirrhoe - のんびりとリラックスした女性音声",
+        },
+        { value: "Despina", label: "Despina - なめらかで流暢な女性音声" },
+        { value: "Erinome", label: "Erinome - クリアで正確な女性音声" },
+        { value: "Gacrux", label: "Gacrux - 成熟した経験豊富な女性音声" },
+        { value: "Laomedeia", label: "Laomedeia - 元気で活発な女性音声" },
+        {
+          value: "Pulcherrima",
+          label: "Pulcherrima - 表現豊かで積極的な女性音声",
+        },
+        { value: "Sulafat", label: "Sulafat - 温かく歓迎的な女性音声" },
+        { value: "Vindemiatrix", label: "Vindemiatrix - 優しく親切な女性音声" },
+        { value: "Achernar", label: "Achernar - ソフトで優しい女性音声" },
+      ],
+      male: [
+        { value: "Puck", label: "Puck - 明るくエネルギッシュな男性音声" },
+        { value: "Charon", label: "Charon - 情報的でクリアな男性音声" },
+        {
+          value: "Fenrir",
+          label: "Fenrir - 興奮しやすくダイナミックな男性音声",
+        },
+        { value: "Orus", label: "Orus - しっかりとした決断力のある男性音声" },
+        {
+          value: "Achird",
+          label: "Achird - フレンドリーで親しみやすい男性音声",
+        },
+        { value: "Algenib", label: "Algenib - 重厚感のあるざらついた男性音声" },
+        { value: "Algieba", label: "Algieba - なめらかで心地よい男性音声" },
+        { value: "Alnilam", label: "Alnilam - しっかりとした力強い男性音声" },
+        {
+          value: "Enceladus",
+          label: "Enceladus - 息づかいが感じられるソフトな男性音声",
+        },
+        { value: "Iapetus", label: "Iapetus - クリアで明瞭な男性音声" },
+        {
+          value: "Rasalgethi",
+          label: "Rasalgethi - 情報的でプロフェッショナルな男性音声",
+        },
+        {
+          value: "Sadachbia",
+          label: "Sadachbia - 活気に満ちたアニメーションのような男性音声",
+        },
+        {
+          value: "Sadaltager",
+          label: "Sadaltager - 知識豊富で権威的な男性音声",
+        },
+        { value: "Schedar", label: "Schedar - 均等でバランスの取れた男性音声" },
+        { value: "Umbriel", label: "Umbriel - のんびりと穏やかな男性音声" },
+        {
+          value: "Zubenelgenubi",
+          label: "Zubenelgenubi - カジュアルで会話的な男性音声",
+        },
+      ],
+    };
+
+    // 既存のオプションをクリア
+    this.voiceSelect.innerHTML = "";
+
+    // 女性音声のオプショングループを追加
+    const femaleOptgroup = document.createElement("optgroup");
+    femaleOptgroup.label = "女性音声";
+    voiceOptions.female.forEach((voice) => {
+      const option = document.createElement("option");
+      option.value = voice.value;
+      option.textContent = voice.label;
+      femaleOptgroup.appendChild(option);
+    });
+    this.voiceSelect.appendChild(femaleOptgroup);
+
+    // 男性音声のオプショングループを追加
+    const maleOptgroup = document.createElement("optgroup");
+    maleOptgroup.label = "男性音声";
+    voiceOptions.male.forEach((voice) => {
+      const option = document.createElement("option");
+      option.value = voice.value;
+      option.textContent = voice.label;
+      maleOptgroup.appendChild(option);
+    });
+    this.voiceSelect.appendChild(maleOptgroup);
+
+    // デフォルト選択
+    this.voiceSelect.value = "Puck";
+  }
+
+  populateMultipleSpeakerVoices() {
+    // 音声選択肢を特徴と共に定義
+    const voiceOptions = {
+      female: [
+        { value: "Kore", label: "Kore - しっかりとした、自信に満ちた女性音声" },
+        { value: "Aoede", label: "Aoede - 爽やかで自然な、風のような女性音声" },
+        { value: "Leda", label: "Leda - 若々しくエネルギッシュな女性音声" },
+        { value: "Zephyr", label: "Zephyr - 明るく陽気な女性音声" },
+        { value: "Autonoe", label: "Autonoe - 明るく楽観的な女性音声" },
+        {
+          value: "Callirrhoe",
+          label: "Callirrhoe - のんびりとリラックスした女性音声",
+        },
+        { value: "Despina", label: "Despina - なめらかで流暢な女性音声" },
+        { value: "Erinome", label: "Erinome - クリアで正確な女性音声" },
+        { value: "Gacrux", label: "Gacrux - 成熟した経験豊富な女性音声" },
+        { value: "Laomedeia", label: "Laomedeia - 元気で活発な女性音声" },
+        {
+          value: "Pulcherrima",
+          label: "Pulcherrima - 表現豊かで積極的な女性音声",
+        },
+        { value: "Sulafat", label: "Sulafat - 温かく歓迎的な女性音声" },
+        { value: "Vindemiatrix", label: "Vindemiatrix - 優しく親切な女性音声" },
+        { value: "Achernar", label: "Achernar - ソフトで優しい女性音声" },
+      ],
+      male: [
+        { value: "Puck", label: "Puck - 明るくエネルギッシュな男性音声" },
+        { value: "Charon", label: "Charon - 情報的でクリアな男性音声" },
+        {
+          value: "Fenrir",
+          label: "Fenrir - 興奮しやすくダイナミックな男性音声",
+        },
+        { value: "Orus", label: "Orus - しっかりとした決断力のある男性音声" },
+        {
+          value: "Achird",
+          label: "Achird - フレンドリーで親しみやすい男性音声",
+        },
+        { value: "Algenib", label: "Algenib - 重厚感のあるざらついた男性音声" },
+        { value: "Algieba", label: "Algieba - なめらかで心地よい男性音声" },
+        { value: "Alnilam", label: "Alnilam - しっかりとした力強い男性音声" },
+        {
+          value: "Enceladus",
+          label: "Enceladus - 息づかいが感じられるソフトな男性音声",
+        },
+        { value: "Iapetus", label: "Iapetus - クリアで明瞭な男性音声" },
+        {
+          value: "Rasalgethi",
+          label: "Rasalgethi - 情報的でプロフェッショナルな男性音声",
+        },
+        {
+          value: "Sadachbia",
+          label: "Sadachbia - 活気に満ちたアニメーションのような男性音声",
+        },
+        {
+          value: "Sadaltager",
+          label: "Sadaltager - 知識豊富で権威的な男性音声",
+        },
+        { value: "Schedar", label: "Schedar - 均等でバランスの取れた男性音声" },
+        { value: "Umbriel", label: "Umbriel - のんびりと穏やかな男性音声" },
+        {
+          value: "Zubenelgenubi",
+          label: "Zubenelgenubi - カジュアルで会話的な男性音声",
+        },
+      ],
+    };
+
+    // 話者A（女性音声）の設定
+    const voiceSelectA = document.getElementById("voice-select-a");
+    if (voiceSelectA) {
+      voiceSelectA.innerHTML = "";
+      const femaleOptgroup = document.createElement("optgroup");
+      femaleOptgroup.label = "女性音声";
+      voiceOptions.female.forEach((voice) => {
+        const option = document.createElement("option");
+        option.value = voice.value;
+        option.textContent = voice.label;
+        femaleOptgroup.appendChild(option);
+      });
+      voiceSelectA.appendChild(femaleOptgroup);
+      voiceSelectA.value = "Kore"; // デフォルト
+    }
+
+    // 話者B（男性音声）の設定
+    const voiceSelectB = document.getElementById("voice-select-b");
+    if (voiceSelectB) {
+      voiceSelectB.innerHTML = "";
+      const maleOptgroup = document.createElement("optgroup");
+      maleOptgroup.label = "男性音声";
+      voiceOptions.male.forEach((voice) => {
+        const option = document.createElement("option");
+        option.value = voice.value;
+        option.textContent = voice.label;
+        maleOptgroup.appendChild(option);
+      });
+      voiceSelectB.appendChild(maleOptgroup);
+      voiceSelectB.value = "Puck"; // デフォルト
     }
   }
 }
