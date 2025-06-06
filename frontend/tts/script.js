@@ -58,24 +58,15 @@ class TTSApp {
       "multiple-voice-settings"
     );
 
-    // File upload elements (重複削除)
-    this.uploadZone = document.getElementById("upload-zone");
-    this.fileInput = document.getElementById("file-input");
-    this.filePreview = document.getElementById("file-preview");
-    this.fileName = document.getElementById("file-name");
-    this.fileSize = document.getElementById("file-size");
-    this.removeFileBtn = document.getElementById("remove-file");
-
     // Voice settings elements
     this.voiceSelect = document.getElementById("voice-select");
-    this.voiceSelectA = document.getElementById("voice-select-a");
-    this.voiceSelectB = document.getElementById("voice-select-b");
     this.voiceStyle = document.getElementById("voice-style");
+
+    // 複数話者用の音声選択要素は動的に取得
+    this.getMultipleSpeakerElements();
 
     // Control elements
     this.generateBtn = document.getElementById("generate-speech");
-    this.btnText = this.generateBtn.querySelector(".btn-text");
-    this.btnLoading = this.generateBtn.querySelector(".btn-loading");
 
     // Audio elements
     this.audioPlayerSection = document.getElementById("audio-player-section");
@@ -86,6 +77,17 @@ class TTSApp {
 
     // 音声選択肢を充実させる
     this.populateVoiceOptions();
+  }
+
+  getMultipleSpeakerElements() {
+    // 複数話者用の音声選択要素を動的に取得
+    this.voiceSelectA = document.getElementById("voice-select-a");
+    this.voiceSelectB = document.getElementById("voice-select-b");
+  }
+
+  getVoiceStyleElement() {
+    // 音声スタイル要素を動的に取得（テキスト入力モード用）
+    return document.getElementById("voice-style");
   }
 
   attachEventListeners() {
@@ -130,6 +132,9 @@ class TTSApp {
     document
       .getElementById("generate-new")
       ?.addEventListener("click", () => this.resetForm());
+
+    // 複数話者モードの音声選択を初期化
+    this.populateMultipleSpeakerVoices();
   }
 
   switchInputMode() {
@@ -162,29 +167,54 @@ class TTSApp {
       'input[name="speaker-mode"]:checked'
     ).value;
 
+    // 要素を動的に取得
+    const singleVoiceSettings = document.getElementById(
+      "single-voice-settings"
+    );
+    const multipleVoiceSettings = document.getElementById(
+      "multiple-voice-settings"
+    );
+
     if (selectedMode === "single") {
-      this.singleVoiceSettings.style.display = "block";
-      this.multipleVoiceSettings.style.display = "none";
+      if (singleVoiceSettings) {
+        singleVoiceSettings.style.display = "block";
+      }
+      if (multipleVoiceSettings) {
+        multipleVoiceSettings.style.display = "none";
+      }
     } else {
-      this.singleVoiceSettings.style.display = "none";
-      this.multipleVoiceSettings.style.display = "block";
+      if (singleVoiceSettings) {
+        singleVoiceSettings.style.display = "none";
+      }
+      if (multipleVoiceSettings) {
+        multipleVoiceSettings.style.display = "block";
+      }
     }
   }
 
   updateCharacterCount() {
-    const currentLength = this.textInput.value.length;
-    this.charCount.textContent = currentLength;
+    // テキスト入力とDOM要素を動的に取得
+    const textInput = document.getElementById("text-input");
+    const charCount = document.getElementById("char-count");
+    const maxChars = document.getElementById("max-chars");
+
+    if (!textInput || !charCount || !maxChars) {
+      return; // 要素が存在しない場合は何もしない
+    }
+
+    const currentLength = textInput.value.length;
+    charCount.textContent = currentLength;
 
     // Update color based on usage
-    const maxLength = parseInt(this.maxChars.textContent);
+    const maxLength = parseInt(maxChars.textContent);
     const percentage = (currentLength / maxLength) * 100;
 
     if (percentage > 90) {
-      this.charCount.style.color = "#f44336";
+      charCount.style.color = "#f44336";
     } else if (percentage > 75) {
-      this.charCount.style.color = "#ff9800";
+      charCount.style.color = "#ff9800";
     } else {
-      this.charCount.style.color = "#666";
+      charCount.style.color = "#666";
     }
 
     // 生成ボタンの状態も更新
@@ -249,9 +279,19 @@ class TTSApp {
   }
 
   showFilePreview(file) {
-    this.fileName.textContent = file.name;
-    this.fileSize.textContent = this.formatFileSize(file.size);
-    this.filePreview.style.display = "block";
+    const fileName = document.getElementById("file-name");
+    const fileSize = document.getElementById("file-size");
+    const filePreview = document.getElementById("file-preview");
+
+    if (fileName) {
+      fileName.textContent = file.name;
+    }
+    if (fileSize) {
+      fileSize.textContent = this.formatFileSize(file.size);
+    }
+    if (filePreview) {
+      filePreview.style.display = "block";
+    }
   }
 
   formatFileSize(bytes) {
@@ -265,9 +305,20 @@ class TTSApp {
   removeFile() {
     this.uploadedFile = null;
     this.extractedContent = "";
-    this.filePreview.style.display = "none";
-    this.extractedContentDiv.style.display = "none";
-    this.fileInput.value = "";
+
+    const filePreview = document.getElementById("file-preview");
+    const extractedContentDiv = document.getElementById("extracted-content");
+    const fileInput = document.getElementById("file-input");
+
+    if (filePreview) {
+      filePreview.style.display = "none";
+    }
+    if (extractedContentDiv) {
+      extractedContentDiv.style.display = "none";
+    }
+    if (fileInput) {
+      fileInput.value = "";
+    }
 
     // 抽出コンテンツコントロールも削除
     const extractedControls = document.getElementById(
@@ -313,13 +364,22 @@ class TTSApp {
   }
 
   showExtractedContent(text) {
-    this.extractedContentDisplay.value = text;
-    this.extractedContentDiv.style.display = "block";
+    const extractedContentDisplay = document.getElementById(
+      "extracted-content-display"
+    );
+    const extractedContentDiv = document.getElementById("extracted-content");
 
-    // 自動保存機能を追加
-    this.extractedContentDisplay.addEventListener("input", () => {
-      this.extractedContent = this.extractedContentDisplay.value;
-    });
+    if (extractedContentDisplay) {
+      extractedContentDisplay.value = text;
+      // 自動保存機能を追加
+      extractedContentDisplay.addEventListener("input", () => {
+        this.extractedContent = extractedContentDisplay.value;
+      });
+    }
+
+    if (extractedContentDiv) {
+      extractedContentDiv.style.display = "block";
+    }
 
     // 抽出されたコンテンツ用の新しいコントロールを表示
     this.showExtractedContentControls();
@@ -455,6 +515,9 @@ class TTSApp {
                 <optgroup label="女性音声">
                   ${generateVoiceOptions(voiceOptions.female)}
                 </optgroup>
+                <optgroup label="男性音声">
+                  ${generateVoiceOptions(voiceOptions.male)}
+                </optgroup>
               </select>
               <button class="btn btn-preview" onclick="previewExtractedVoice('A')">
                 プレビュー
@@ -463,6 +526,9 @@ class TTSApp {
             <div class="speaker-config">
               <h4>話者B</h4>
               <select id="extracted-voice-select-b">
+                <optgroup label="女性音声">
+                  ${generateVoiceOptions(voiceOptions.female)}
+                </optgroup>
                 <optgroup label="男性音声">
                   ${generateVoiceOptions(voiceOptions.male)}
                 </optgroup>
@@ -687,28 +753,36 @@ class TTSApp {
     }
   }
 
-  getExtractedVoiceSettings(speakerMode) {
+  getVoiceSettings(speakerMode) {
     if (speakerMode === "single") {
+      const voiceSelect = document.getElementById("voice-select");
       return {
-        voice:
-          document.getElementById("extracted-voice-select")?.value || "Kore",
+        voice: voiceSelect ? voiceSelect.value : "Kore",
       };
     } else {
+      // 複数話者要素を動的に取得
+      this.getMultipleSpeakerElements();
+
       return {
-        voiceA:
-          document.getElementById("extracted-voice-select-a")?.value || "Kore",
-        voiceB:
-          document.getElementById("extracted-voice-select-b")?.value || "Puck",
+        voiceA: this.voiceSelectA?.value || "Kore",
+        voiceB: this.voiceSelectB?.value || "Puck",
       };
     }
   }
 
   async previewVoice(speaker = null) {
+    // 複数話者要素を動的に取得
+    this.getMultipleSpeakerElements();
+
     const voiceId = speaker
       ? speaker === "A"
-        ? this.voiceSelectA.value
-        : this.voiceSelectB.value
+        ? this.voiceSelectA?.value || "Kore"
+        : this.voiceSelectB?.value || "Puck"
       : this.voiceSelect.value;
+
+    // 音声スタイルを安全に取得
+    const voiceStyleElement = this.getVoiceStyleElement();
+    const voiceStyleValue = voiceStyleElement ? voiceStyleElement.value : "";
 
     try {
       const response = await fetch("/api/tts/preview-voice", {
@@ -719,7 +793,7 @@ class TTSApp {
         body: JSON.stringify({
           voice: voiceId,
           text: "こんにちは。これは音声のプレビューです。",
-          style: this.voiceStyle.value || "",
+          style: voiceStyleValue,
         }),
       });
 
@@ -846,76 +920,121 @@ class TTSApp {
       return;
     }
 
+    // 短いテキストの場合は少し長くする
+    if (textContent.length < 3) {
+      this.showError("音声化するテキストは3文字以上で入力してください。");
+      return;
+    }
+
     // Get voice settings
     const speakerMode = document.querySelector(
       'input[name="speaker-mode"]:checked'
     ).value;
     const voiceSettings = this.getVoiceSettings(speakerMode);
 
-    try {
-      this.startGeneration();
+    // 音声スタイルを安全に取得
+    const voiceStyleElement = this.getVoiceStyleElement();
+    const voiceStyleValue = voiceStyleElement ? voiceStyleElement.value : "";
 
-      const response = await fetch("/api/tts/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: textContent,
-          speaker_mode: speakerMode,
-          voice_settings: voiceSettings,
-          style: this.voiceStyle.value || "",
-        }),
-      });
+    // 最大3回まで再試行
+    let retryCount = 0;
+    const maxRetries = 3;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    while (retryCount < maxRetries) {
+      try {
+        this.startGeneration();
+
+        const response = await fetch("/api/tts/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: textContent,
+            speaker_mode: speakerMode,
+            voice_settings: voiceSettings,
+            style: voiceStyleValue,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+          // 音声プレイヤーを表示
+          this.showAudioPlayer(result.audio_data, result.format);
+          this.showSuccess("音声の生成が完了しました！");
+          return; // 成功したので関数を終了
+        } else {
+          throw new Error(result.error || "音声生成に失敗しました");
+        }
+      } catch (error) {
+        console.error(
+          `Speech generation error (attempt ${retryCount + 1}):`,
+          error
+        );
+
+        // 500エラーの場合は再試行
+        if (error.message.includes("500") && retryCount < maxRetries - 1) {
+          retryCount++;
+          console.log(`500エラー検出、${retryCount}回目の再試行を実行中...`);
+          this.stopGeneration();
+          await new Promise((resolve) => setTimeout(resolve, 2000)); // 2秒待機
+          continue;
+        } else {
+          // 最終試行または500以外のエラーの場合
+          this.showError(error.message || "音声生成に失敗しました");
+          break;
+        }
+      } finally {
+        this.stopGeneration();
       }
-
-      const result = await response.json();
-
-      if (result.success) {
-        // 音声プレイヤーを表示
-        this.showAudioPlayer(result.audio_data, result.format);
-        this.showSuccess("音声の生成が完了しました！");
-      } else {
-        throw new Error(result.error || "音声生成に失敗しました");
-      }
-    } catch (error) {
-      console.error("Speech generation error:", error);
-      this.showError(error.message || "音声生成に失敗しました");
-    } finally {
-      this.stopGeneration();
     }
-  }
 
-  getVoiceSettings(speakerMode) {
-    if (speakerMode === "single") {
-      return {
-        voice: this.voiceSelect.value,
-      };
-    } else {
-      return {
-        voiceA: this.voiceSelectA.value,
-        voiceB: this.voiceSelectB.value,
-      };
+    if (retryCount >= maxRetries) {
+      this.showError(
+        "音声生成に失敗しました。しばらく時間をおいて再度お試しください。"
+      );
     }
   }
 
   startGeneration() {
     this.isGenerating = true;
-    this.generateBtn.disabled = true;
-    this.btnText.style.display = "none";
-    this.btnLoading.style.display = "flex";
-    this.showProcessingStatus();
+    if (this.generateBtn) {
+      this.generateBtn.disabled = true;
+
+      // 動的にボタンの子要素を取得
+      const btnText = this.generateBtn.querySelector(".btn-text");
+      const btnLoading = this.generateBtn.querySelector(".btn-loading");
+
+      if (btnText) {
+        btnText.style.display = "none";
+      }
+      if (btnLoading) {
+        btnLoading.style.display = "flex";
+      }
+    }
   }
 
   stopGeneration() {
     this.isGenerating = false;
-    this.generateBtn.disabled = false;
-    this.btnText.style.display = "inline";
-    this.btnLoading.style.display = "none";
-    this.hideProcessingStatus();
+    if (this.generateBtn) {
+      this.generateBtn.disabled = false;
+
+      // 動的にボタンの子要素を取得
+      const btnText = this.generateBtn.querySelector(".btn-text");
+      const btnLoading = this.generateBtn.querySelector(".btn-loading");
+
+      if (btnText) {
+        btnText.style.display = "inline";
+      }
+      if (btnLoading) {
+        btnLoading.style.display = "none";
+      }
+    }
   }
 
   showAudioPlayer(audioData, format) {
@@ -933,11 +1052,18 @@ class TTSApp {
     }
 
     this.currentAudioUrl = URL.createObjectURL(blob);
-    this.audioPlayer.src = this.currentAudioUrl;
-    this.audioPlayerSection.style.display = "block";
 
-    // Scroll to audio section
-    this.audioPlayerSection.scrollIntoView({ behavior: "smooth" });
+    const audioPlayer = document.getElementById("audio-player");
+    const audioPlayerSection = document.getElementById("audio-player-section");
+
+    if (audioPlayer) {
+      audioPlayer.src = this.currentAudioUrl;
+    }
+    if (audioPlayerSection) {
+      audioPlayerSection.style.display = "block";
+      // Scroll to audio section
+      audioPlayerSection.scrollIntoView({ behavior: "smooth" });
+    }
   }
 
   async downloadAudio(format) {
@@ -966,17 +1092,26 @@ class TTSApp {
 
   resetForm() {
     // Reset input
-    this.textInput.value = "";
+    const textInput = document.getElementById("text-input");
+    if (textInput) {
+      textInput.value = "";
+    }
     this.updateCharacterCount();
 
     // Reset file upload
     this.removeFile();
 
-    // Reset voice settings
-    this.voiceStyle.value = "";
+    // Reset voice settings - 安全にアクセス
+    const voiceStyleElement = this.getVoiceStyleElement();
+    if (voiceStyleElement) {
+      voiceStyleElement.value = "";
+    }
 
     // Hide audio player
-    this.audioPlayerSection.style.display = "none";
+    const audioPlayerSection = document.getElementById("audio-player-section");
+    if (audioPlayerSection) {
+      audioPlayerSection.style.display = "none";
+    }
 
     // Clean up audio URL
     if (this.currentAudioUrl) {
@@ -987,7 +1122,10 @@ class TTSApp {
 
   // Status and notification methods
   showProcessingStatus() {
-    this.processingStatus.style.display = "block";
+    const processingStatus = document.getElementById("processing-status");
+    if (processingStatus) {
+      processingStatus.style.display = "block";
+    }
     this.updateProcessingStep(1);
 
     // Simulate processing steps
@@ -997,13 +1135,19 @@ class TTSApp {
   hideProcessingStatus() {
     this.updateProcessingStep(3);
     setTimeout(() => {
-      this.processingStatus.style.display = "none";
+      const processingStatus = document.getElementById("processing-status");
+      if (processingStatus) {
+        processingStatus.style.display = "none";
+      }
       this.resetProcessingSteps();
     }, 1500);
   }
 
   updateProcessingStep(step) {
-    const steps = this.processingStatus.querySelectorAll(".status-step");
+    const processingStatus = document.getElementById("processing-status");
+    if (!processingStatus) return;
+
+    const steps = processingStatus.querySelectorAll(".status-step");
 
     steps.forEach((stepEl, index) => {
       stepEl.classList.remove("active", "completed");
@@ -1017,7 +1161,10 @@ class TTSApp {
   }
 
   resetProcessingSteps() {
-    const steps = this.processingStatus.querySelectorAll(".status-step");
+    const processingStatus = document.getElementById("processing-status");
+    if (!processingStatus) return;
+
+    const steps = processingStatus.querySelectorAll(".status-step");
     steps.forEach((step) => {
       step.classList.remove("active", "completed");
     });
@@ -1055,10 +1202,16 @@ class TTSApp {
     // テキスト入力モード用の生成ボタンの状態を更新
     const inputMode = document.querySelector(
       'input[name="input-mode"]:checked'
-    ).value;
+    )?.value;
+
     if (inputMode === "text") {
-      const hasText = this.textInput.value.trim().length > 0;
-      this.generateBtn.disabled = !hasText;
+      const textInput = document.getElementById("text-input");
+      const generateBtn = document.getElementById("generate-speech");
+
+      if (textInput && generateBtn) {
+        const hasText = textInput.value.trim().length > 0;
+        generateBtn.disabled = !hasText;
+      }
     }
   }
 
@@ -1070,7 +1223,10 @@ class TTSApp {
   }
 
   hideGeneratedAudio() {
-    this.audioPlayerSection.style.display = "none";
+    const audioPlayerSection = document.getElementById("audio-player-section");
+    if (audioPlayerSection) {
+      audioPlayerSection.style.display = "none";
+    }
     if (this.currentAudioUrl) {
       URL.revokeObjectURL(this.currentAudioUrl);
       this.currentAudioUrl = null;
@@ -1078,7 +1234,11 @@ class TTSApp {
   }
 
   hideExtractedContent() {
-    this.extractedContentDiv.style.display = "none";
+    const extractedContentDiv = document.getElementById("extracted-content");
+    if (extractedContentDiv) {
+      extractedContentDiv.style.display = "none";
+    }
+
     // 抽出コンテンツコントロールも非表示
     const extractedControls = document.getElementById(
       "extracted-content-controls"
@@ -1091,9 +1251,20 @@ class TTSApp {
   resetFileUpload() {
     this.uploadedFile = null;
     this.extractedContent = "";
-    this.filePreview.style.display = "none";
-    this.extractedContentDiv.style.display = "none";
-    this.fileInput.value = "";
+
+    const filePreview = document.getElementById("file-preview");
+    const extractedContentDiv = document.getElementById("extracted-content");
+    const fileInput = document.getElementById("file-input");
+
+    if (filePreview) {
+      filePreview.style.display = "none";
+    }
+    if (extractedContentDiv) {
+      extractedContentDiv.style.display = "none";
+    }
+    if (fileInput) {
+      fileInput.value = "";
+    }
 
     // 抽出コンテンツコントロールも削除
     const extractedControls = document.getElementById(
@@ -1131,6 +1302,10 @@ class TTSApp {
   }
 
   populateVoiceOptions() {
+    // 音声選択要素を動的に取得
+    const voiceSelect = document.getElementById("voice-select");
+    if (!voiceSelect) return;
+
     // 音声選択肢を特徴と共に定義
     const voiceOptions = {
       female: [
@@ -1197,7 +1372,7 @@ class TTSApp {
     };
 
     // 既存のオプションをクリア
-    this.voiceSelect.innerHTML = "";
+    voiceSelect.innerHTML = "";
 
     // 女性音声のオプショングループを追加
     const femaleOptgroup = document.createElement("optgroup");
@@ -1208,7 +1383,7 @@ class TTSApp {
       option.textContent = voice.label;
       femaleOptgroup.appendChild(option);
     });
-    this.voiceSelect.appendChild(femaleOptgroup);
+    voiceSelect.appendChild(femaleOptgroup);
 
     // 男性音声のオプショングループを追加
     const maleOptgroup = document.createElement("optgroup");
@@ -1219,10 +1394,10 @@ class TTSApp {
       option.textContent = voice.label;
       maleOptgroup.appendChild(option);
     });
-    this.voiceSelect.appendChild(maleOptgroup);
+    voiceSelect.appendChild(maleOptgroup);
 
     // デフォルト選択
-    this.voiceSelect.value = "Puck";
+    voiceSelect.value = "Puck";
   }
 
   populateMultipleSpeakerVoices() {
@@ -1291,35 +1466,63 @@ class TTSApp {
       ],
     };
 
-    // 話者A（女性音声）の設定
+    // 話者A（全ての音声から選択可能）
     const voiceSelectA = document.getElementById("voice-select-a");
     if (voiceSelectA) {
       voiceSelectA.innerHTML = "";
-      const femaleOptgroup = document.createElement("optgroup");
-      femaleOptgroup.label = "女性音声";
+
+      // 女性音声のオプショングループを追加
+      const femaleOptgroupA = document.createElement("optgroup");
+      femaleOptgroupA.label = "女性音声";
       voiceOptions.female.forEach((voice) => {
         const option = document.createElement("option");
         option.value = voice.value;
         option.textContent = voice.label;
-        femaleOptgroup.appendChild(option);
+        femaleOptgroupA.appendChild(option);
       });
-      voiceSelectA.appendChild(femaleOptgroup);
-      voiceSelectA.value = "Kore"; // デフォルト
-    }
+      voiceSelectA.appendChild(femaleOptgroupA);
 
-    // 話者B（男性音声）の設定
-    const voiceSelectB = document.getElementById("voice-select-b");
-    if (voiceSelectB) {
-      voiceSelectB.innerHTML = "";
-      const maleOptgroup = document.createElement("optgroup");
-      maleOptgroup.label = "男性音声";
+      // 男性音声のオプショングループを追加
+      const maleOptgroupA = document.createElement("optgroup");
+      maleOptgroupA.label = "男性音声";
       voiceOptions.male.forEach((voice) => {
         const option = document.createElement("option");
         option.value = voice.value;
         option.textContent = voice.label;
-        maleOptgroup.appendChild(option);
+        maleOptgroupA.appendChild(option);
       });
-      voiceSelectB.appendChild(maleOptgroup);
+      voiceSelectA.appendChild(maleOptgroupA);
+
+      voiceSelectA.value = "Kore"; // デフォルト
+    }
+
+    // 話者B（全ての音声から選択可能）
+    const voiceSelectB = document.getElementById("voice-select-b");
+    if (voiceSelectB) {
+      voiceSelectB.innerHTML = "";
+
+      // 女性音声のオプショングループを追加
+      const femaleOptgroupB = document.createElement("optgroup");
+      femaleOptgroupB.label = "女性音声";
+      voiceOptions.female.forEach((voice) => {
+        const option = document.createElement("option");
+        option.value = voice.value;
+        option.textContent = voice.label;
+        femaleOptgroupB.appendChild(option);
+      });
+      voiceSelectB.appendChild(femaleOptgroupB);
+
+      // 男性音声のオプショングループを追加
+      const maleOptgroupB = document.createElement("optgroup");
+      maleOptgroupB.label = "男性音声";
+      voiceOptions.male.forEach((voice) => {
+        const option = document.createElement("option");
+        option.value = voice.value;
+        option.textContent = voice.label;
+        maleOptgroupB.appendChild(option);
+      });
+      voiceSelectB.appendChild(maleOptgroupB);
+
       voiceSelectB.value = "Puck"; // デフォルト
     }
   }
