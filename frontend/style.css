@@ -165,7 +165,11 @@ body {
 }
 
 #image-preview-area {
-  /* Styles already applied inline, but can add more here */
+  /* container for multi previews */
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .clear-image-btn {

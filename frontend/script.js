@@ -3,13 +3,12 @@ const userInput = document.getElementById("user-input");
 const sendButton = document.getElementById("send-button");
 const imageUpload = document.getElementById("image-upload");
 const imagePreviewArea = document.getElementById("image-preview-area");
-const imagePreview = document.getElementById("image-preview");
 const clearImageButton = document.getElementById("clear-image-button");
 const newChatButton = document.getElementById("new-chat-button");
 const inputArea = document.querySelector(".input-area");
 
 let chatHistory = []; // Array to store chat history [{role: 'user'/'model', parts: [...]}]
-let selectedImageData = null; // To store { mime_type: '...', data: '...' (base64) }
+let selectedImagesData = []; // Array of { mime_type, data, previewUrl }
 
 // --- Dynamic Textarea Height ---
 function adjustTextareaHeight() {
@@ -30,30 +29,57 @@ adjustTextareaHeight();
 
 // --- Image Upload Handling ---
 imageUpload.addEventListener("change", (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64String = e.target.result.split(",")[1]; // Get base64 part
-      selectedImageData = {
-        mime_type: file.type,
-        data: base64String,
+  const files = Array.from(event.target.files || []);
+  if (files.length > 0) {
+    let pending = files.length;
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64String = e.target.result.split(",")[1];
+        const previewUrl = e.target.result;
+        selectedImagesData.push({
+          mime_type: file.type,
+          data: base64String,
+          previewUrl,
+        });
+        // Render preview chip
+        renderImagePreviews();
+        imagePreviewArea.style.display = "flex";
+        if (--pending === 0) {
+          // all done
+        }
       };
-      imagePreview.src = e.target.result; // Show preview
-      imagePreviewArea.style.display = "block";
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    });
   }
   // Reset file input value so the 'change' event fires even if the same file is selected again
   event.target.value = null;
 });
 
 clearImageButton.addEventListener("click", () => {
-  selectedImageData = null;
-  imagePreview.src = "#";
+  selectedImagesData = [];
+  renderImagePreviews();
   imagePreviewArea.style.display = "none";
-  imageUpload.value = null; // Clear the file input
+  imageUpload.value = null;
 });
+
+function renderImagePreviews() {
+  // Remove existing preview images (keep clear button)
+  const nodes = Array.from(imagePreviewArea.querySelectorAll("img.preview"));
+  nodes.forEach((n) => n.remove());
+
+  selectedImagesData.forEach((img, idx) => {
+    const tag = document.createElement("img");
+    tag.className = "preview";
+    tag.src = img.previewUrl;
+    tag.alt = `Image ${idx + 1}`;
+    tag.style.height = "40px";
+    tag.style.width = "auto";
+    tag.style.borderRadius = "4px";
+    tag.style.border = "1px solid #cce0ff";
+    imagePreviewArea.insertBefore(tag, clearImageButton);
+  });
+}
 // --- End Image Upload Handling ---
 
 // --- Session Control ---
@@ -191,15 +217,16 @@ function addMessage(sender, contentParts) {
 
 async function sendMessage() {
   const prompt = userInput.value.trim();
-  if (!prompt && !selectedImageData) return; // Need prompt or image
+  if (!prompt && selectedImagesData.length === 0) return; // Need prompt or image
 
   const userMessageParts = [];
-  if (selectedImageData) {
-    // Add uploaded image preview to chat
-    userMessageParts.push({
-      type: "image",
-      content: imagePreview.src,
-      isUpload: true,
+  if (selectedImagesData.length > 0) {
+    selectedImagesData.forEach((img) => {
+      userMessageParts.push({
+        type: "image",
+        content: img.previewUrl,
+        isUpload: true,
+      });
     });
   }
   if (prompt) {
@@ -212,16 +239,17 @@ async function sendMessage() {
 
   // Prepare data for API
   const requestData = {
-    prompt: prompt, // Send original text prompt
-    // Send history *excluding* the user message we just added
+    prompt: prompt,
     history: chatHistory.slice(0, -1),
-    image_data: selectedImageData, // Send selected image data { mime_type, data (base64) }
+    images_data: selectedImagesData.map((img) => ({
+      mime_type: img.mime_type,
+      data: img.data,
+    })),
   };
 
   // Clear selected image *after* preparing data, before API call starts maybe? Or after success? Let's clear after sending.
-  const currentSelectedImage = selectedImageData; // Keep a copy for the request
-  selectedImageData = null; // Clear for next message
-  imagePreview.src = "#";
+  selectedImagesData = [];
+  renderImagePreviews();
   imagePreviewArea.style.display = "none";
   imageUpload.value = null;
 

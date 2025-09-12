@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     # For PDF processing
     libpoppler-cpp-dev \
     # For image processing and OCR
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \

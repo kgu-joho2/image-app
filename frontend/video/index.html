@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Veo 3 Fast - 動画生成</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <nav
+      class="navigation"
+      style="
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        padding: 16px 24px;
+        margin-bottom: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      "
+    >
+      <div
+        class="nav-links"
+        style="display: flex; gap: 20px; justify-content: center"
+      >
+        <a
+          href="../index.html"
+          class="nav-link"
+          style="
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+          "
+          >画像生成</a
+        >
+        <a
+          href="../tts/index.html"
+          class="nav-link"
+          style="
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+          "
+          >TTS</a
+        >
+        <a
+          href="./index.html"
+          class="nav-link active"
+          style="
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.2);
+          "
+          >/video</a
+        >
+      </div>
+    </nav>
+
+    <div class="video-container">
+      <div class="header">
+        <h1>Veo 3 Fast - 動画生成</h1>
+        <p>テキストまたは画像から動画を生成</p>
+      </div>
+
+      <div class="mode-selection">
+        <label class="mode-option">
+          <input type="radio" name="video-input-mode" value="text" checked />
+          <span>テキスト → 動画</span>
+        </label>
+        <label class="mode-option">
+          <input type="radio" name="video-input-mode" value="image" />
+          <span>画像 → 動画</span>
+        </label>
+      </div>
+
+      <div id="text-mode" class="input-section">
+        <textarea
+          id="video-prompt"
+          placeholder="生成したい動画の説明、シーン、動き、カメラ、スタイルなどを入力..."
+          rows="6"
+        ></textarea>
+      </div>
+
+      <div id="image-mode" class="input-section" style="display: none">
+        <div
+          style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"
+        >
+          <label for="video-image-upload" class="upload-button"
+            >📎 参照画像</label
+          >
+          <input
+            type="file"
+            id="video-image-upload"
+            accept="image/*"
+            multiple
+            style="display: none"
+          />
+          <div
+            id="video-image-preview-area"
+            style="
+              display: none;
+              margin-top: 8px;
+              display: flex;
+              gap: 8px;
+              align-items: center;
+              flex-wrap: wrap;
+            "
+          ></div>
+        </div>
+        <div class="setting-group" style="margin-top: 12px">
+          <label for="video-image-prompt">画像に基づく動画の指示（必須）</label>
+          <textarea
+            id="video-image-prompt"
+            rows="4"
+            placeholder="例: 画像の猫が伸びをしてあくびをする。ゆっくりドリーアウト、朝の柔らかい光、やさしい音楽。"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="generate-section">
+        <button id="generate-video" class="btn btn-primary btn-large">
+          <span class="btn-text">動画を生成</span>
+          <span class="btn-loading" style="display: none">
+            <div class="spinner"></div>
+            生成中...
+          </span>
+        </button>
+      </div>
+
+      <div id="video-result" class="video-result" style="display: none">
+        <h3>生成された動画</h3>
+        <video
+          id="result-video"
+          controls
+          style="max-width: 100%; border-radius: 8px"
+        ></video>
+        <div class="audio-actions" style="justify-content: flex-start">
+          <button id="download-video" class="btn btn-secondary">
+            動画をダウンロード
+          </button>
+          <button id="new-video" class="btn btn-primary">新しく生成</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

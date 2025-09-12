@@ -50,6 +50,19 @@
           "
           >TTS</a
         >
+        <a
+          href="video/index.html"
+          class="nav-link"
+          style="
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+          "
+          >/video</a
+        >
       </div>
     </nav>
 
@@ -67,20 +80,23 @@
           type="file"
           id="image-upload"
           accept="image/*"
+          multiple
           style="display: none"
         />
 
         <!-- Image Preview Area -->
         <div
           id="image-preview-area"
-          style="display: none; margin-right: 10px; position: relative"
+          style="
+            display: none;
+            margin-right: 10px;
+            position: relative;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+          "
         >
-          <img
-            id="image-preview"
-            src="#"
-            alt="Image Preview"
-            style="height: 40px; width: auto; border-radius: 4px"
-          />
+          <!-- multiple previews rendered by JS -->
           <button id="clear-image-button" class="clear-image-btn">×</button>
         </div>
 

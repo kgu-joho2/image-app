@@ -3,6 +3,9 @@ import io
 from flask import Flask, request, jsonify, send_from_directory, make_response
 from dotenv import load_dotenv
 import google.generativeai as genai
+from google import genai as genai_new
+from google.genai import types as genai_types
+import time
 import pkg_resources # Import pkg_resources
 # Remove direct type imports if they cause issues with the installed version
 # from google.generativeai import types # Commented out or remove
@@ -40,6 +43,9 @@ if not api_key:
     raise ValueError("GOOGLE_API_KEY environment variable not set.")
 genai.configure(api_key=api_key)
 
+# Initialize new GenAI client (google.genai) for image/video generation
+genai_client = genai_new.Client(api_key=api_key)
+
 # Removed helper function create_content_part as we construct dictionaries directly
 
 @app.route('/')
@@ -54,6 +60,15 @@ def tts_index():
 @app.route('/tts/<path:filename>')
 def tts_static(filename):
     return send_from_directory('../frontend/tts', filename)
+
+# Video Static Files
+@app.route('/video/')
+def video_index():
+    return send_from_directory('../frontend/video', 'index.html')
+
+@app.route('/video/<path:filename>')
+def video_static(filename):
+    return send_from_directory('../frontend/video', filename)
 
 # TTS API Endpoints
 @app.route('/api/tts/extract-text', methods=['POST'])
@@ -180,6 +195,7 @@ def generate_image():
         prompt = data.get('prompt')
         history_data = data.get('history', [])
         image_input_data = data.get('image_data') # { mime_type: ..., data: base64_string }
+        images_input_data = data.get('images_data')  # [ { mime_type, data }, ... ]
 
         print(f"Received prompt: {prompt}")
         print(f"Received history length: {len(history_data)}")
@@ -243,125 +259,80 @@ def generate_image():
             processed_prompt = None # Ensure variable exists even if there's no prompt
         # --- End Prompt Processing Step ---
 
-        # Construct the contents list using dictionaries directly
-        contents = []
+        # Build contents using google.genai types
+        contents_list = []
 
-        # Process history (send original history)
-        contents.extend(history_data)
+        # Map history into types.Content
+        try:
+            for h in history_data:
+                role = h.get('role', 'user')
+                parts = []
+                for p in h.get('parts', []):
+                    if 'text' in p and p['text']:
+                        parts.append(genai_types.Part(text=p['text']))
+                if parts:
+                    contents_list.append(genai_types.Content(role=role, parts=parts))
+        except Exception as e:
+            print(f"History mapping skipped due to error: {e}")
 
-        # Construct the current user message parts as dictionaries
-        current_parts_list = []
-        # Use the processed (enhanced or translated) prompt if available
+        # Current user message
+        current_parts = []
         if processed_prompt:
-            current_parts_list.append({"text": processed_prompt})
+            current_parts.append(genai_types.Part(text=processed_prompt))
 
-        if image_input_data:
+        # Normalize images list (support single image_data for backward compatibility)
+        normalized_images = []
+        if isinstance(images_input_data, list) and images_input_data:
+            normalized_images = images_input_data
+        elif image_input_data:
+            normalized_images = [image_input_data]
+
+        for idx, img in enumerate(normalized_images):
             try:
-                image_part_dict = {
-                    "inline_data": {
-                        "mime_type": image_input_data["mime_type"],
-                        "data": image_input_data["data"]
-                    }
-                }
-                current_parts_list.append(image_part_dict)
-                print(f"Added uploaded image part: {image_input_data['mime_type']}")
-            except (KeyError, TypeError) as e:
-                print(f"Error processing uploaded image data structure: {e}")
-                # Append error text or handle differently? Let's keep it simple.
-                # Maybe don't add a text part here if image fails, rely on overall check.
-                pass # Rely on the check below
+                mime_type = img.get('mime_type')
+                b64_data = img.get('data')
+                if not mime_type or not b64_data:
+                    continue
+                image_bytes = base64.b64decode(b64_data)
+                blob = genai_types.Blob(mime_type=mime_type, data=image_bytes)
+                current_parts.append(genai_types.Part(inline_data=blob))
+                print(f"Added image[{idx}] part: {mime_type}, {len(image_bytes)} bytes")
+            except Exception as e:
+                print(f"Failed to process image[{idx}] for request: {e}")
 
-        if not current_parts_list:
-             # This case should ideally not happen if initial check passed,
-             # but handles edge cases like failed image processing without text prompt.
-            print("Error: No valid parts to send after processing prompt and image.")
+        if not current_parts:
+            print("Error: No valid parts to send after processing prompt and images.")
             return jsonify({"error": "送信する有効なメッセージパートがありません。"}), 400
 
-        contents.append({"role": "user", "parts": current_parts_list})
+        contents_list.append(genai_types.Content(role="user", parts=current_parts))
 
-        # --- Call Image Generation Model (remains the same) ---
-        model = genai.GenerativeModel("gemini-2.0-flash-exp-image-generation")
-
-        # generation_config as dictionary (or None)
-        generation_config_dict = {
-             "response_modalities": ["TEXT", "IMAGE"], # Explicitly request image output
-             # "temperature": 0.7 # Example
-        }
-        # if not generation_config_dict: # No longer needed as we always set modalities
-        #      generation_config_dict = None
-
-        print(f"Sending contents to Gemini (dict format): {contents}")
-        print(f"Using generation_config: {generation_config_dict}") # Add log for config
-
-        # Use generate_content with stream=True
-        response_stream = model.generate_content(
-            contents=contents,
-            generation_config=generation_config_dict,
-            stream=True # Set stream=True here
+        # Call Gemini 2.5 Flash Image (Nano Banana)
+        print(f"Sending contents to Gemini 2.5 Flash Image. parts_count={len(current_parts)}")
+        response = genai_client.models.generate_content(
+            model="gemini-2.5-flash-image-preview",
+            contents=contents_list,
+            config=genai_types.GenerateContentConfig(
+                response_modalities=["TEXT", "IMAGE"]
+            ),
         )
 
-        print("--- Processing Gemini API Stream ---")
+        # Parse response
         results = []
-        full_response_text = "" # To accumulate text if needed
-
-        try:
-            for chunk in response_stream:
-                if not chunk.candidates:
-                    print("Received chunk with no candidates, skipping.")
-                    continue
-
-                print(f"Processing chunk: {chunk}") # Log each received chunk
-
-                for part in chunk.candidates[0].content.parts:
-                    print(f"Processing response part: {part}")
-                    if hasattr(part, 'text') and part.text:
-                        print(f"Found text part in chunk: {part.text[:50]}...")
+        if response and getattr(response, 'candidates', None):
+            cand = response.candidates[0]
+            if getattr(cand, 'content', None) and getattr(cand.content, 'parts', None):
+                for part in cand.content.parts:
+                    if getattr(part, 'text', None):
                         results.append({"type": "text", "content": part.text})
-                        full_response_text += part.text # Accumulate text if necessary
-
-                    elif hasattr(part, 'inline_data') and part.inline_data:
-                        print(f"Found inline_data part in chunk. Mime type: {part.inline_data.mime_type}")
-                        image_data = part.inline_data.data
-                        mime_type = part.inline_data.mime_type
-                        base64_image = base64.b64encode(image_data).decode('utf-8')
-                        data_url = f"data:{mime_type};base64,{base64_image}"
-                        print(f"Generated data URL from chunk: {data_url[:100]}...")
+                    elif getattr(part, 'inline_data', None):
+                        mime_type = getattr(part.inline_data, 'mime_type', 'image/png')
+                        data_bytes = getattr(part.inline_data, 'data', b"")
+                        base64_data = base64.b64encode(data_bytes).decode('utf-8')
+                        data_url = f"data:{mime_type};base64,{base64_data}"
                         results.append({"type": "image", "content": data_url})
-                    else:
-                        print(f"Chunk part has no processable text or inline_data: {part}")
 
-        # Handle potential errors during streaming, like finish_reason being SAFETY
-        except genai.types.BlockedPromptException as e:
-             print(f"BlockedPromptException during stream: {e}")
-             return jsonify({"error": f"リクエストがブロックされました。プロンプトの内容を確認してください。 {e}"}), 400
-        except genai.types.StopCandidateException as e:
-             print(f"StopCandidateException during stream: {e}")
-             # Check if we got any results before stopping
-             if results:
-                  print("Stream stopped potentially due to safety, but sending partial results.")
-                  # Optionally add a warning message to results
-                  results.append({"type": "text", "content": "[注意: コンテンツ生成が途中で停止された可能性があります]"})
-             else:
-                  return jsonify({"error": f"コンテンツ生成が安全上の理由で停止しました。 {e}"}), 400
-        # Catch other potential exceptions related to the stream
-        except Exception as e:
-            print(f"An error occurred during streaming: {e}")
-            traceback.print_exc()
-            return jsonify({"error": f"ストリーム処理中に予期せぬエラーが発生しました: {str(e)}"}), 500
-
-
-        # Check prompt feedback after iterating through the stream if available on the stream object
-        # (Note: prompt_feedback might be on the first chunk or aggregated differently in streaming)
-        # Let's rely on the exceptions for now.
-
-        print("--- Stream Processing Finished ---")
-        print(f"Final accumulated results being sent to frontend: {results}")
-
-        # If results are empty after processing stream (e.g., only empty chunks received)
         if not results:
-             print("No processable content found in the entire stream.")
-             return jsonify({"error": "モデルから有効な応答が得られませんでした。"}), 500
-
+            return jsonify({"error": "モデルから有効な応答が得られませんでした。"}), 500
 
         return jsonify({"results": results})
 
@@ -381,6 +352,196 @@ def generate_image():
              return jsonify({"error": f"SDKの互換性エラーが発生しました: {e}"}), 500
 
         return jsonify({"error": f"予期せぬエラーが発生しました: {str(e)}"}), 500
+
+
+@app.route('/api/video/generate', methods=['POST'])
+def generate_video():
+    try:
+        data = request.get_json()
+        prompt = data.get('prompt', '')
+        images_input_data = data.get('images_data', [])  # optional list
+        options = data.get('options', {})  # duration, resolution, etc. (optional)
+
+        # 画像アップロードを1枚のみに制限
+        if isinstance(images_input_data, list) and len(images_input_data) > 1:
+            return jsonify({"error": "動画生成では画像を1枚のみアップロードできます。複数枚の画像は選択できません。"}), 400  # duration, resolution, etc. (optional)
+
+        # Prompt preprocessing: enhance/translate to rich English video prompt
+        processed_prompt = prompt
+        if prompt:
+            try:
+                prompt_processor_model = genai.GenerativeModel("gemini-2.0-flash")
+                # If image is provided, enforce instruction to use it as first frame and preserve identity
+                if images_input_data:
+                    instruction = (
+                        "You are a professional video prompt engineer. Rewrite the user's Japanese request "
+                        "into a detailed, production-ready English prompt for Veo image-to-video generation. "
+                        "IMPORTANT: The request includes a reference image. Instruct to USE THE ATTACHED IMAGE as the FIRST FRAME, "
+                        "preserve subject identity, appearance, colors, and layout, then animate according to the instructions. "
+                        "Be explicit about actions over time (timeline), camera movement (e.g., dolly-in, drone shot), composition/framing, "
+                        "lighting and color mood, visual style, and ambience. Keep it concise but specific. Do not repeat numeric options. "
+                        "Output only the final English prompt with no explanation."
+                    )
+                else:
+                    instruction = (
+                        "You are a professional video prompt engineer. Rewrite the user's Japanese request "
+                        "into a detailed, production-ready English prompt for Veo video generation. "
+                        "Be explicit about subject(s), actions over time (timeline), camera movement (e.g., dolly-in, drone shot), "
+                        "composition and framing (e.g., close-up, wide shot), lighting and color mood, visual style (e.g., cinematic, anime), "
+                        "and environment/ambience. Keep it concise but specific. If user gave duration/aspect/fps/style separately, do not repeat. "
+                        "Output only the final English prompt with no explanation."
+                    )
+                enhancement_response = prompt_processor_model.generate_content(
+                    f"{instruction}\n\nUser request (Japanese): {prompt}"
+                )
+                if (
+                    enhancement_response.candidates
+                    and enhancement_response.candidates[0].content
+                    and enhancement_response.candidates[0].content.parts
+                    and enhancement_response.candidates[0].content.parts[0].text
+                ):
+                    processed_prompt = enhancement_response.candidates[0].content.parts[0].text.strip()
+            except Exception as e:
+                print(f"Video prompt processing skipped: {e}")
+
+        # Build prompt with options (no generation_config for video API)
+        option_instructions = []
+        duration = options.get('duration_seconds')
+        # Clamp duration to 1-8 seconds (Veo 3 typical limit)
+        try:
+            if duration is not None:
+                duration = max(1, min(8, int(duration)))
+        except Exception:
+            duration = None
+        if duration:
+            option_instructions.append(f"Duration: {duration} seconds.")
+        aspect_ratio = options.get('aspect_ratio')
+        if aspect_ratio:
+            option_instructions.append(f"Aspect ratio: {aspect_ratio}.")
+        fps = options.get('fps')
+        if fps:
+            option_instructions.append(f"Frame rate: {fps} fps.")
+        style = options.get('style')
+        if style:
+            option_instructions.append(f"Style: {style}.")
+        prompt_with_opts = processed_prompt or ''
+        if option_instructions:
+            prompt_with_opts = (processed_prompt or '') + "\n" + " ".join(option_instructions)
+
+        # Enforce prompt requirement for video generation (text-to-video or image+text)
+        if not (prompt_with_opts and len(prompt_with_opts.strip()) > 0):
+            if images_input_data:
+                return jsonify({"error": "画像から動画生成には指示テキストが必須です（画像モードのテキストを入力してください）。"}), 400
+            else:
+                return jsonify({"error": "テキストから動画生成にはプロンプトが必要です。"}), 400
+
+        # Prepare optional single reference image (best-effort)
+        image_arg = None
+        if isinstance(images_input_data, list) and images_input_data:
+            try:
+                first = images_input_data[0]
+                mime_type = first.get('mime_type')
+                b64_data = first.get('data')
+                if mime_type and b64_data:
+                    # SDK v0.6.0以降では辞書形式が必要
+                    image_arg = {
+                        "imageBytes": b64_data,
+                        "mimeType": mime_type.lower()  # 大文字小文字を正規化
+                    }
+                    print(f"Using first reference image for video: {mime_type}, base64_length={len(b64_data)}")
+            except Exception as e:
+                print(f"Failed to prepare reference image: {e}")
+
+        # Call Veo 3 Fast via generate_videos (no response_modalities)
+        # Build GenerateVideosConfig from options
+        config_kwargs = {}
+        if duration:
+            config_kwargs["duration_seconds"] = int(duration)
+        if aspect_ratio:
+            # Allow only common ratios; ignore others silently
+            allowed_ar = {"16:9", "9:16", "1:1", "4:3"}
+            if aspect_ratio in allowed_ar:
+                config_kwargs["aspect_ratio"] = aspect_ratio
+        if fps:
+            try:
+                fps_int = int(fps)
+                if fps_int in (24, 30, 60):
+                    config_kwargs["frame_rate"] = fps_int
+            except Exception:
+                pass
+
+        # Call Veo 3 Fast
+        kwargs = {
+            "model": "veo-3.0-fast-generate-001",
+            "prompt": prompt_with_opts,
+        }
+        if config_kwargs:
+            kwargs["config"] = genai_types.GenerateVideosConfig(**config_kwargs)
+        if image_arg:
+            kwargs["image"] = image_arg
+
+        operation = genai_client.models.generate_videos(**kwargs)
+
+        # Poll operation
+        max_wait_sec = 120
+        interval = 5
+        waited = 0
+        while not getattr(operation, 'done', False) and waited < max_wait_sec:
+            time.sleep(interval)
+            waited += interval
+            operation = genai_client.operations.get(operation)
+
+        if not getattr(operation, 'done', False):
+            return jsonify({"error": "動画生成がタイムアウトしました。しばらくして再試行してください。"}), 504
+
+        # Extract video file and download
+        try:
+            video_item = operation.response.generated_videos[0]
+        except Exception as e:
+            print(f"No generated_videos in response: {e}")
+            return jsonify({"error": "モデルから動画出力が得られませんでした。"}), 500
+
+        try:
+            download_obj = genai_client.files.download(file=video_item.video)
+            video_bytes = None
+            # Try common attributes
+            if isinstance(download_obj, (bytes, bytearray)):
+                video_bytes = bytes(download_obj)
+            elif hasattr(download_obj, 'data') and download_obj.data:
+                video_bytes = download_obj.data
+            elif hasattr(download_obj, 'contents') and download_obj.contents:
+                video_bytes = download_obj.contents
+            elif hasattr(download_obj, 'read'):
+                video_bytes = download_obj.read()
+            if not video_bytes:
+                raise RuntimeError("Failed to obtain video bytes from download")
+
+            mime_type = getattr(getattr(video_item, 'video', None), 'mime_type', 'video/mp4')
+            base64_video = base64.b64encode(video_bytes).decode('utf-8')
+            data_url = f"data:{mime_type};base64,{base64_video}"
+            return jsonify({"results": [{"type": "video", "content": data_url}]})
+        except Exception as e:
+            print(f"Video download failed: {e}")
+            traceback.print_exc()
+            return jsonify({"error": f"動画のダウンロードに失敗しました: {str(e)}"}), 500
+    except Exception as e:
+        print(f"Video generation error: {e}")
+        traceback.print_exc()
+        
+        # 429 RESOURCE_EXHAUSTED エラーの特別処理
+        error_str = str(e)
+        if "429" in error_str and ("RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()):
+            return jsonify({
+                "error": "動画生成の1日あたりの利用上限に達しました。明日再度お試しください。",
+                "error_type": "quota_exceeded"
+            }), 429
+        elif "quota" in error_str.lower() or "exceeded" in error_str.lower():
+            return jsonify({
+                "error": "動画生成の利用上限に達しました。しばらく時間をおいてから再度お試しください。",
+                "error_type": "quota_exceeded"
+            }), 429
+        
+        return jsonify({"error": f"動画生成中にエラーが発生しました: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True) 
