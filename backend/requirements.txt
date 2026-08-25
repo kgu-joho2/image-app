@@ -1,9 +1,8 @@
-Flask==2.3.3
-google-generativeai>=0.8.5
+Flask>=3.0.0
 python-dotenv==1.0.0
 Pillow==10.0.1
 # TTS機能用ライブラリ
-google-genai>=0.4.0
+google-genai>=1.60.0  # Lyria 3 (client.interactions) 対応
 google-cloud-documentai>=2.20.1
 google-cloud-vision>=3.4.5
 PyPDF2>=3.0.1

@@ -1,0 +1,3 @@
+.thumbs:empty { display: none; }
+#struct-chips .chip { font-family: var(--mono); }
+#bpm-val { margin-left: 6px; }

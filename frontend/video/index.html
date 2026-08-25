@@ -3,155 +3,146 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Veo 3 Fast - 動画生成</title>
+    <title>動画生成 - Gemini Studio</title>
+    <link rel="stylesheet" href="/common/base.css" />
     <link rel="stylesheet" href="style.css" />
+    <script src="/common/nav.js"></script>
   </head>
   <body>
-    <nav
-      class="navigation"
-      style="
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 12px;
-        padding: 16px 24px;
-        margin-bottom: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-      "
-    >
-      <div
-        class="nav-links"
-        style="display: flex; gap: 20px; justify-content: center"
-      >
-        <a
-          href="../index.html"
-          class="nav-link"
-          style="
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 500;
-          "
-          >画像生成</a
-        >
-        <a
-          href="../tts/index.html"
-          class="nav-link"
-          style="
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 500;
-          "
-          >TTS</a
-        >
-        <a
-          href="./index.html"
-          class="nav-link active"
-          style="
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            background: rgba(255, 255, 255, 0.2);
-          "
-          >/video</a
-        >
-      </div>
-    </nav>
-
-    <div class="video-container">
-      <div class="header">
-        <h1>Veo 3 Fast - 動画生成</h1>
-        <p>テキストまたは画像から動画を生成</p>
+    <main class="page">
+      <div class="page-head">
+        <h1>🎬 動画生成</h1>
+        <p>Veo 3.1 でテキスト・画像から音声付き動画を生成。最初と最後のフレーム指定、参照画像、動画の延長に対応。</p>
       </div>
 
-      <div class="mode-selection">
-        <label class="mode-option">
-          <input type="radio" name="video-input-mode" value="text" checked />
-          <span>テキスト → 動画</span>
-        </label>
-        <label class="mode-option">
-          <input type="radio" name="video-input-mode" value="image" />
-          <span>画像 → 動画</span>
-        </label>
-      </div>
+      <div class="layout">
+        <aside class="stack">
+          <section class="card">
+            <h3>⚙️ 生成設定</h3>
+            <div class="stack">
+              <div class="field">
+                <label>モデル</label>
+                <div class="segmented">
+                  <label><input type="radio" name="model" value="fast" checked />Fast</label>
+                  <label><input type="radio" name="model" value="standard" />標準</label>
+                  <label><input type="radio" name="model" value="lite" />Lite</label>
+                </div>
+                <div class="hint">Fast: 速い / 標準: 高品質 / Lite: 低コスト</div>
+              </div>
+              <div class="grid-2">
+                <div class="field">
+                  <label>長さ</label>
+                  <select id="opt-duration">
+                    <option value="4">4秒</option>
+                    <option value="6">6秒</option>
+                    <option value="8" selected>8秒</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>解像度</label>
+                  <select id="opt-resolution">
+                    <option value="720p" selected>720p</option>
+                    <option value="1080p">1080p</option>
+                    <option value="4k">4K</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>アスペクト比</label>
+                <div class="segmented">
+                  <label><input type="radio" name="aspect" value="16:9" checked />16:9 横</label>
+                  <label><input type="radio" name="aspect" value="9:16" />9:16 縦</label>
+                </div>
+              </div>
+              <div class="field">
+                <label>ネガティブプロンプト（避けたい要素）</label>
+                <input type="text" id="opt-negative" placeholder="例: 文字, ぼやけ, 低画質" />
+              </div>
+              <p class="hint">Veo 3.1 は音声付きで生成されます（Developer API では音声のON/OFF指定は不可）。</p>
+              <label class="check"><input type="checkbox" id="opt-enhance" checked /><span>日本語プロンプトを英語に整形（Gemini）</span></label>
+            </div>
+          </section>
+        </aside>
 
-      <div id="text-mode" class="input-section">
-        <textarea
-          id="video-prompt"
-          placeholder="生成したい動画の説明、シーン、動き、カメラ、スタイルなどを入力..."
-          rows="6"
-        ></textarea>
-      </div>
+        <section class="stack">
+          <section class="card">
+            <div class="segmented" id="mode-seg">
+              <label><input type="radio" name="mode" value="text" checked />テキスト</label>
+              <label><input type="radio" name="mode" value="frames" />画像（最初/最後のフレーム）</label>
+              <label><input type="radio" name="mode" value="refs" />参照画像</label>
+              <label><input type="radio" name="mode" value="extend" id="mode-extend" disabled />延長</label>
+            </div>
 
-      <div id="image-mode" class="input-section" style="display: none">
-        <div
-          style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap"
-        >
-          <label for="video-image-upload" class="upload-button"
-            >📎 参照画像</label
-          >
-          <input
-            type="file"
-            id="video-image-upload"
-            accept="image/*"
-            multiple
-            style="display: none"
-          />
-          <div
-            id="video-image-preview-area"
-            style="
-              display: none;
-              margin-top: 8px;
-              display: flex;
-              gap: 8px;
-              align-items: center;
-              flex-wrap: wrap;
-            "
-          ></div>
-        </div>
-        <div class="setting-group" style="margin-top: 12px">
-          <label for="video-image-prompt">画像に基づく動画の指示（必須）</label>
-          <textarea
-            id="video-image-prompt"
-            rows="4"
-            placeholder="例: 画像の猫が伸びをしてあくびをする。ゆっくりドリーアウト、朝の柔らかい光、やさしい音楽。"
-          ></textarea>
-        </div>
-      </div>
+            <div class="mode-panel" data-mode="frames">
+              <div class="grid-2">
+                <div class="field">
+                  <label>最初のフレーム（必須）</label>
+                  <div class="dropzone" id="drop-first">📎 画像を選択 / ドロップ</div>
+                  <input type="file" id="file-first" accept="image/*" style="display:none" />
+                  <div class="thumbs" id="thumb-first"></div>
+                </div>
+                <div class="field">
+                  <label>最後のフレーム（任意）</label>
+                  <div class="dropzone" id="drop-last">📎 画像を選択 / ドロップ</div>
+                  <input type="file" id="file-last" accept="image/*" style="display:none" />
+                  <div class="thumbs" id="thumb-last"></div>
+                </div>
+              </div>
+            </div>
+            <div class="mode-panel" data-mode="refs">
+              <div class="field">
+                <label>参照画像（最大3枚・被写体の見た目を固定）</label>
+                <div class="dropzone" id="drop-refs">📎 画像を選択 / ドロップ（複数可）</div>
+                <input type="file" id="file-refs" accept="image/*" multiple style="display:none" />
+                <div class="thumbs" id="thumb-refs"></div>
+              </div>
+            </div>
+            <div class="mode-panel" data-mode="extend">
+              <p class="hint">直前に生成した動画の続きを生成します（720p固定）。</p>
+              <div class="thumbs" id="thumb-extend"></div>
+            </div>
 
-      <div class="generate-section">
-        <button id="generate-video" class="btn btn-primary btn-large">
-          <span class="btn-text">動画を生成</span>
-          <span class="btn-loading" style="display: none">
-            <div class="spinner"></div>
-            生成中...
-          </span>
-        </button>
-      </div>
+            <div class="field" style="margin-top:12px">
+              <label id="prompt-label">プロンプト</label>
+              <textarea id="prompt" rows="4" placeholder="例: 朝霧の中の湖畔を、ドローンでゆっくり前進しながら撮影。水面に朝日が反射し、鳥が飛び立つ。穏やかなピアノ。"></textarea>
+            </div>
+            <div class="row">
+              <span class="hint">Ctrl/⌘ + Enter で生成</span>
+              <span class="spacer"></span>
+              <button class="btn btn-primary btn-lg" id="generate">
+                <span class="btn-text">動画を生成</span>
+                <span class="btn-loading"><span class="spinner"></span>生成中...</span>
+              </button>
+            </div>
+          </section>
 
-      <div id="video-result" class="video-result" style="display: none">
-        <h3>生成された動画</h3>
-        <video
-          id="result-video"
-          controls
-          style="max-width: 100%; border-radius: 8px"
-        ></video>
-        <div class="audio-actions" style="justify-content: flex-start">
-          <button id="download-video" class="btn btn-secondary">
-            動画をダウンロード
-          </button>
-          <button id="new-video" class="btn btn-primary">新しく生成</button>
-        </div>
-      </div>
-    </div>
+          <section class="card" id="progress-card" style="display:none">
+            <h3>⏳ 生成中</h3>
+            <div class="progress indeterminate"><i></i></div>
+            <div class="row" style="margin-top:8px">
+              <span class="hint" id="progress-text">リクエストを送信しています…</span>
+              <span class="spacer"></span>
+              <button class="btn btn-secondary btn-sm" id="cancel">中止</button>
+            </div>
+          </section>
 
+          <section class="card" id="result-card" style="display:none">
+            <h3>✅ 生成された動画</h3>
+            <div class="result-media"><video id="result-video" controls playsinline></video></div>
+            <div class="meta row" id="result-meta" style="margin-top:8px"></div>
+            <div class="result-actions">
+              <button class="btn btn-primary" id="act-extend">➕ この動画を延長</button>
+              <button class="btn btn-secondary" id="act-download">⬇️ ダウンロード</button>
+              <button class="btn btn-secondary" id="act-new">🆕 新しく生成</button>
+            </div>
+            <details style="margin-top:10px"><summary>送信したプロンプト</summary><pre id="result-prompt"></pre></details>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script src="/common/ui.js"></script>
+    <script src="/common/history.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

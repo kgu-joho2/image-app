@@ -1,294 +1,176 @@
-const modeRadios = document.querySelectorAll('input[name="video-input-mode"]');
-const textMode = document.getElementById("text-mode");
-const imageMode = document.getElementById("image-mode");
-const promptInput = document.getElementById("video-prompt");
-const imageUpload = document.getElementById("video-image-upload");
-const imagePreviewArea = document.getElementById("video-image-preview-area");
-const generateButton = document.getElementById("generate-video");
-const resultSection = document.getElementById("video-result");
-const resultVideo = document.getElementById("result-video");
-const downloadBtn = document.getElementById("download-video");
-const newBtn = document.getElementById("new-video");
+/* 動画生成ページ — /api/video/jobs (Veo 3.1, ジョブID方式) */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const promptEl = $("prompt"), genBtn = $("generate"), progressCard = $("progress-card"), progressText = $("progress-text"),
+    resultCard = $("result-card"), resultVideo = $("result-video");
 
-// Options UIは削除されたため、参照を無効化
-const optDuration = null;
-const optAspect = null;
-const optFps = null;
-const optStyle = null;
-const optStyleSelect = null;
-const imageModePrompt = document.getElementById("video-image-prompt");
+  const MAX_REFS = 3;
+  let first = null, last = null, refs = [];
+  let lastJob = null;     // {job_id, blob, prompt}
+  let polling = null, aborted = false;
 
-let selectedImages = [];
-
-modeRadios.forEach((r) =>
-  r.addEventListener("change", () => {
-    const mode = document.querySelector(
-      'input[name="video-input-mode"]:checked'
-    ).value;
-    if (mode === "text") {
-      textMode.style.display = "block";
-      imageMode.style.display = "none";
-    } else {
-      textMode.style.display = "none";
-      imageMode.style.display = "block";
-    }
-  })
-);
-
-imageUpload.addEventListener("change", (e) => {
-  const files = Array.from(e.target.files || []);
-
-  // 動画生成では1枚のみアップロード可能
-  if (files.length > 1) {
-    alert(
-      "動画生成では画像を1枚のみアップロードできます。最初の画像のみが使用されます。"
-    );
+  // ---------- モード ----------
+  function mode() { return document.querySelector('input[name="mode"]:checked').value; }
+  function renderMode() {
+    const m = mode();
+    document.querySelectorAll(".mode-panel").forEach((p) => p.classList.toggle("on", p.dataset.mode === m));
+    $("prompt-label").textContent = { text: "プロンプト", frames: "画像に基づく動きの指示", refs: "参照画像を使ったシーンの指示", extend: "続きの内容" }[m];
+    const disableAR = m === "extend";
+    document.querySelectorAll('input[name="aspect"]').forEach((r) => (r.disabled = disableAR));
+    $("opt-resolution").disabled = disableAR;
   }
+  document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", renderMode));
 
-  // 既存の画像をクリアして、新しい画像（最初の1枚のみ）を追加
-  selectedImages = [];
-
-  if (files.length > 0) {
-    const file = files[0]; // 最初の1枚のみ
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      const base64 = dataUrl.split(",")[1];
-      selectedImages.push({
-        mime_type: file.type,
-        data: base64,
-        previewUrl: dataUrl,
-      });
-      renderPreviews();
-    };
-    reader.readAsDataURL(file);
+  // ---------- 画像入力 ----------
+  function bindDrop(zoneId, fileId, onFiles) {
+    const zone = $(zoneId), input = $(fileId);
+    zone.addEventListener("click", () => input.click());
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drag"));
+    zone.addEventListener("drop", (e) => { e.preventDefault(); zone.classList.remove("drag"); onFiles(Array.from(e.dataTransfer.files || [])); });
+    input.addEventListener("change", (e) => { onFiles(Array.from(e.target.files || [])); e.target.value = null; });
   }
-  e.target.value = null;
-});
-
-function renderPreviews() {
-  imagePreviewArea.innerHTML = "";
-  if (selectedImages.length > 0) {
-    imagePreviewArea.style.display = "flex";
+  function thumb(container, img, onRemove, tag) {
+    container.innerHTML = "";
+    if (!img) return;
+    const t = document.createElement("div");
+    t.className = "thumb";
+    t.innerHTML = `<img src="${img.previewUrl}" />${tag ? `<span class="tag">${tag}</span>` : ""}<button class="rm">×</button>`;
+    t.querySelector(".rm").addEventListener("click", onRemove);
+    container.appendChild(t);
   }
-  selectedImages.forEach((img, idx) => {
-    const tag = document.createElement("img");
-    tag.src = img.previewUrl;
-    tag.alt = `ref ${idx + 1}`;
-    tag.style.height = "60px";
-    tag.style.borderRadius = "6px";
-    tag.style.border = "1px solid #cce0ff";
-    imagePreviewArea.appendChild(tag);
-  });
-}
-
-generateButton.addEventListener("click", async () => {
-  const mode = document.querySelector(
-    'input[name="video-input-mode"]:checked'
-  ).value;
-  let prompt = (promptInput.value || "").trim();
-  if (mode === "text" && !prompt) {
-    alert("テキストを入力してください");
-    return;
-  }
-  if (mode === "image") {
-    const imgPrompt = (imageModePrompt?.value || "").trim();
-    if (selectedImages.length === 0) {
-      alert("参照画像を少なくとも1枚選択してください");
-      return;
-    }
-    if (!imgPrompt) {
-      alert("画像に基づく動画の指示テキストを入力してください");
-      return;
-    }
-    prompt = imgPrompt;
-  }
-
-  setLoading(true);
-  try {
-    const body = {
-      prompt,
-      images_data: selectedImages.map((i) => ({
-        mime_type: i.mime_type,
-        data: i.data,
-      })),
-      options: {},
-    };
-
-    const res = await fetch("/api/video/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+  function renderRefs() {
+    const c = $("thumb-refs");
+    c.innerHTML = "";
+    refs.forEach((img, i) => {
+      const t = document.createElement("div");
+      t.className = "thumb";
+      t.innerHTML = `<img src="${img.previewUrl}" /><span class="tag">${i + 1}</span><button class="rm">×</button>`;
+      t.querySelector(".rm").addEventListener("click", () => { refs.splice(i, 1); renderRefs(); });
+      c.appendChild(t);
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      // クォータエラーの特別処理
-      if (err.error_type === "quota_exceeded" || res.status === 429) {
-        throw new Error(
-          `QUOTA_EXCEEDED:${err.error || "動画生成の利用上限に達しました。"}`
-        );
-      }
-      throw new Error(err.error || `HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    const videoItem = (data.results || []).find((r) => r.type === "video");
-    if (!videoItem) throw new Error("動画が返りませんでした");
-
-    const { blob } = dataURLToBlob(videoItem.content);
-    const objectUrl = URL.createObjectURL(blob);
-    resultVideo.src = objectUrl;
-    resultVideo.controls = true;
-    resultVideo.volume = 1.0;
-    resultSection.style.display = "block";
-  } catch (e) {
-    console.error(e);
-
-    // クォータエラーの場合は専用のポップアップを表示
-    if (e.message.startsWith("QUOTA_EXCEEDED:")) {
-      const quotaMessage = e.message.replace("QUOTA_EXCEEDED:", "");
-      showQuotaExceededPopup(quotaMessage);
-    } else {
-      alert(`エラー: ${e.message}`);
-    }
-  } finally {
-    setLoading(false);
   }
-});
-
-downloadBtn.addEventListener("click", async () => {
-  if (!resultVideo.src) return;
-  const a = document.createElement("a");
-  a.href = resultVideo.src;
-  a.download = `generated_video_${Date.now()}.mp4`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-});
-
-newBtn.addEventListener("click", () => {
-  promptInput.value = "";
-  selectedImages = [];
-  renderPreviews();
-  imagePreviewArea.style.display = "none";
-  resultVideo.removeAttribute("src");
-  resultSection.style.display = "none";
-});
-
-function setLoading(loading) {
-  generateButton.disabled = loading;
-  const text = generateButton.querySelector(".btn-text");
-  const loadingEl = generateButton.querySelector(".btn-loading");
-  if (text) text.style.display = loading ? "none" : "inline";
-  if (loadingEl) loadingEl.style.display = loading ? "flex" : "none";
-}
-
-function toNumber(v) {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
-
-function clamp(n, min, max) {
-  if (typeof n !== "number") return undefined;
-  return Math.max(min, Math.min(max, n));
-}
-
-function dataURLToBlob(dataURL) {
-  const parts = dataURL.split(",");
-  const mimeMatch = parts[0].match(/:(.*?);/);
-  const mime = (mimeMatch && mimeMatch[1]) || "video/mp4";
-  const bstr = atob(parts[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-  return { blob: new Blob([u8arr], { type: mime }), mime };
-}
-
-// クォータエラー専用のポップアップ表示
-function showQuotaExceededPopup(message) {
-  // 既存のポップアップがあれば削除
-  const existingPopup = document.getElementById("quota-popup");
-  if (existingPopup) {
-    existingPopup.remove();
-  }
-
-  // ポップアップ要素を作成
-  const popup = document.createElement("div");
-  popup.id = "quota-popup";
-  popup.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-  `;
-
-  const popupContent = document.createElement("div");
-  popupContent.style.cssText = `
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    max-width: 400px;
-    text-align: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    border: 2px solid #ff6b6b;
-  `;
-
-  const icon = document.createElement("div");
-  icon.style.cssText = `
-    font-size: 48px;
-    margin-bottom: 16px;
-    color: #ff6b6b;
-  `;
-  icon.textContent = "⚠️";
-
-  const title = document.createElement("h3");
-  title.style.cssText = `
-    margin: 0 0 12px 0;
-    color: #333;
-    font-size: 18px;
-  `;
-  title.textContent = "利用上限に達しました";
-
-  const messageEl = document.createElement("p");
-  messageEl.style.cssText = `
-    margin: 0 0 20px 0;
-    color: #666;
-    line-height: 1.4;
-  `;
-  messageEl.textContent = message;
-
-  const button = document.createElement("button");
-  button.style.cssText = `
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 16px;
-  `;
-  button.textContent = "閉じる";
-  button.addEventListener("click", () => popup.remove());
-
-  popupContent.appendChild(icon);
-  popupContent.appendChild(title);
-  popupContent.appendChild(messageEl);
-  popupContent.appendChild(button);
-  popup.appendChild(popupContent);
-
-  // クリックで閉じる
-  popup.addEventListener("click", (e) => {
-    if (e.target === popup) {
-      popup.remove();
-    }
+  bindDrop("drop-first", "file-first", async (fs) => { if (fs[0]) { first = await UI.shrinkImage(fs[0]); thumb($("thumb-first"), first, () => { first = null; thumb($("thumb-first"), null); }, "最初"); } });
+  bindDrop("drop-last", "file-last", async (fs) => { if (fs[0]) { last = await UI.shrinkImage(fs[0]); thumb($("thumb-last"), last, () => { last = null; thumb($("thumb-last"), null); }, "最後"); } });
+  bindDrop("drop-refs", "file-refs", async (fs) => {
+    const room = MAX_REFS - refs.length;
+    if (fs.length > room) UI.toast(`参照画像は最大${MAX_REFS}枚までです`, "warn");
+    for (const f of fs.slice(0, Math.max(0, room))) refs.push(await UI.shrinkImage(f));
+    renderRefs();
   });
 
-  document.body.appendChild(popup);
-}
+  // ---------- 生成 ----------
+  function opts() {
+    return {
+      model: document.querySelector('input[name="model"]:checked').value,
+      duration_seconds: Number($("opt-duration").value),
+      resolution: $("opt-resolution").value,
+      aspect_ratio: document.querySelector('input[name="aspect"]:checked').value,
+      negative_prompt: $("opt-negative").value.trim(),
+      enhance_prompt: $("opt-enhance").checked,
+    };
+  }
+  const strip = (i) => (i ? { mime_type: i.mime_type, data: i.data } : null);
+
+  async function generate() {
+    const prompt = promptEl.value.trim();
+    const m = mode();
+    if (!prompt) return UI.toast("プロンプトを入力してください", "warn");
+    if (m === "frames" && !first) return UI.toast("最初のフレーム画像を選択してください", "warn");
+    if (m === "refs" && !refs.length) return UI.toast("参照画像を1枚以上選択してください", "warn");
+    if (m === "extend" && !lastJob) return UI.toast("延長元の動画がありません", "warn");
+
+    const body = { prompt, options: opts() };
+    if (m === "frames") { body.first_frame = strip(first); if (last) body.last_frame = strip(last); }
+    if (m === "refs") body.reference_images = refs.map(strip);
+    if (m === "extend") body.extend_job_id = lastJob.job_id;
+
+    aborted = false;
+    UI.setLoading(genBtn, true);
+    resultCard.style.display = "none";
+    progressCard.style.display = "block";
+    progressText.textContent = "リクエストを送信しています…";
+    const started = Date.now();
+    try {
+      const job = await UI.api("/api/video/jobs", { body });
+      progressText.textContent = "生成中… 通常1〜3分かかります（1080p/4Kはさらに長くなります）";
+      const result = await poll(job.job_id, started);
+      if (aborted) return;
+      showResult(result, prompt, job.job_id);
+    } catch (e) {
+      if (!aborted) UI.handleError(e, "動画生成に失敗しました");
+    } finally {
+      UI.setLoading(genBtn, false);
+      progressCard.style.display = "none";
+    }
+  }
+  function poll(jobId, started) {
+    return new Promise((resolve, reject) => {
+      const tick = async () => {
+        if (aborted) return resolve(null);
+        try {
+          const d = await UI.api(`/api/video/jobs/${jobId}`, { method: "GET" });
+          if (d.status === "done") return resolve(d);
+          const s = Math.floor((Date.now() - started) / 1000);
+          progressText.textContent = `生成中… 経過 ${UI.fmtTime(s)}（通常1〜3分。4K・1080pは長めです）`;
+          polling = setTimeout(tick, 8000);
+        } catch (e) { reject(e); }
+      };
+      polling = setTimeout(tick, 6000);
+    });
+  }
+  $("cancel").addEventListener("click", () => {
+    aborted = true;
+    clearTimeout(polling);
+    UI.setLoading(genBtn, false);
+    progressCard.style.display = "none";
+    UI.toast("待機を中止しました（サーバー側の生成は継続します）", "warn");
+  });
+
+  function showResult(d, prompt, jobId) {
+    const item = d.results.find((r) => r.type === "video");
+    if (!item) throw new Error("動画が返りませんでした");
+    const blob = UI.dataURLToBlob(item.content, "video/mp4");
+    if (resultVideo.src) URL.revokeObjectURL(resultVideo.src);
+    resultVideo.src = URL.createObjectURL(blob);
+    const o = opts();
+    $("result-meta").innerHTML = `<span class="badge">${UI.escapeHtml(d.model)}</span><span class="badge">${o.duration_seconds}秒 / ${mode() === "extend" ? "720p" : o.resolution} / ${o.aspect_ratio}</span><span class="badge">${UI.fmtTime(d.elapsed || 0)}</span>`;
+    $("result-prompt").textContent = d.prompt_used || prompt;
+    resultCard.style.display = "block";
+    resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    lastJob = { job_id: jobId, blob, prompt };
+    $("mode-extend").disabled = false;
+    const te = $("thumb-extend");
+    te.innerHTML = `<div class="thumb"><video src="${resultVideo.src}" muted></video></div>`;
+    History.add({ type: "video", blob, mime: blob.type, prompt, meta: { model: d.model, ...o, prompt_used: d.prompt_used } });
+  }
+
+  $("act-download").addEventListener("click", () => lastJob && UI.download(lastJob.blob, `video_${UI.stamp()}.mp4`));
+  $("act-extend").addEventListener("click", () => {
+    $("mode-extend").checked = true; renderMode();
+    promptEl.value = ""; promptEl.placeholder = "例: その後カメラが引いて、街全体が見渡せるようになる"; promptEl.focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  $("act-new").addEventListener("click", () => {
+    resultCard.style.display = "none";
+    promptEl.value = ""; first = last = null; refs = [];
+    thumb($("thumb-first"), null); thumb($("thumb-last"), null); renderRefs();
+    document.querySelector('input[name="mode"][value="text"]').checked = true; renderMode();
+  });
+  genBtn.addEventListener("click", generate);
+  promptEl.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); generate(); } });
+
+  // 画像ページ / ギャラリーからの受け渡し → 最初のフレームに
+  (async () => {
+    const h = await History.handoffTake("video");
+    if (!h || !h.blob) return;
+    const dataUrl = await UI.blobToDataURL(h.blob);
+    first = { mime_type: h.mime || h.blob.type, data: dataUrl.split(",")[1], previewUrl: dataUrl };
+    thumb($("thumb-first"), first, () => { first = null; thumb($("thumb-first"), null); }, "最初");
+    document.querySelector('input[name="mode"][value="frames"]').checked = true;
+    renderMode();
+    if (h.prompt) promptEl.placeholder = `例: 「${h.prompt.slice(0, 40)}」の画像が動き出す…`;
+    UI.toast("画像を最初のフレームとして読み込みました", "success");
+  })();
+  renderMode();
+})();

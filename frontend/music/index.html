@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>音楽生成 - Gemini Studio</title>
+    <link rel="stylesheet" href="/common/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="/common/nav.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <div class="page-head">
+        <h1>🎵 音楽生成</h1>
+        <p>Lyria 3 でテキスト（＋参照画像）から 44.1kHz ステレオの楽曲を生成。歌詞付き・インストどちらも可能。</p>
+      </div>
+
+      <div class="layout">
+        <aside class="stack">
+          <section class="card">
+            <h3>🎛️ プロンプトビルダー</h3>
+            <p class="hint">選んだ要素はプロンプトに追記されます。</p>
+            <div class="stack">
+              <div class="field"><label>ジャンル</label><div class="chips" data-group="genre"></div></div>
+              <div class="field"><label>ムード</label><div class="chips" data-group="mood"></div></div>
+              <div class="field"><label>楽器</label><div class="chips" data-group="inst"></div></div>
+              <div class="field">
+                <label>テンポ <span id="bpm-val" class="badge">指定なし</span></label>
+                <input type="range" id="bpm" min="50" max="200" value="120" />
+                <label class="check"><input type="checkbox" id="bpm-on" /><span>BPMを指定する</span></label>
+              </div>
+              <div class="grid-2">
+                <div class="field"><label>キー</label>
+                  <select id="key"><option value="">指定なし</option>
+                    <option>C major</option><option>G major</option><option>D major</option><option>A major</option><option>E major</option><option>F major</option><option>Bb major</option>
+                    <option>A minor</option><option>E minor</option><option>D minor</option><option>B minor</option><option>F# minor</option><option>C minor</option><option>G minor</option>
+                  </select>
+                </div>
+                <div class="field"><label>ボーカル</label>
+                  <select id="vocal"><option value="">指定なし</option><option value="instrumental">インストゥルメンタル</option><option value="female">女性ボーカル</option><option value="male">男性ボーカル</option><option value="duet">デュエット</option></select>
+                </div>
+              </div>
+              <div class="row">
+                <button class="btn btn-secondary btn-sm" id="apply-builder">↓ プロンプトに反映</button>
+                <button class="btn btn-ghost btn-sm" id="reset-builder">クリア</button>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <section class="stack">
+          <section class="card">
+            <div class="row" style="margin-bottom:10px">
+              <div class="segmented">
+                <label><input type="radio" name="model" value="clip" checked />30秒クリップ</label>
+                <label><input type="radio" name="model" value="pro" />フル尺（数分）</label>
+              </div>
+              <span class="spacer"></span>
+              <label class="check"><input type="checkbox" id="opt-wav" disabled /><span>WAV出力（フル尺のみ）</span></label>
+            </div>
+            <div class="field">
+              <label>プロンプト</label>
+              <textarea id="prompt" rows="7" placeholder="例: 夜のドライブに合うローファイ・ヒップホップ。90 BPM、エレピとブラシのドラム、雨音。インストゥルメンタル。&#10;&#10;歌モノの例:&#10;[Verse] 街の灯りが滲む夜 …&#10;[Chorus] 走り出そう …"></textarea>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <span class="hint">構成タグを挿入:</span>
+              <div class="chips" id="struct-chips">
+                <span class="chip" data-ins="[Intro]">[Intro]</span>
+                <span class="chip" data-ins="[Verse]">[Verse]</span>
+                <span class="chip" data-ins="[Pre-Chorus]">[Pre-Chorus]</span>
+                <span class="chip" data-ins="[Chorus]">[Chorus]</span>
+                <span class="chip" data-ins="[Bridge]">[Bridge]</span>
+                <span class="chip" data-ins="[Outro]">[Outro]</span>
+                <span class="chip" data-ins="[0:00 - 0:10] ">タイムスタンプ</span>
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <label class="upload-btn" for="image-upload">📎 参照画像（最大10枚）</label>
+              <input type="file" id="image-upload" accept="image/*" multiple style="display:none" />
+              <div class="thumbs" id="image-thumbs"></div>
+            </div>
+            <div class="row" style="margin-top:12px">
+              <label class="check"><input type="checkbox" id="opt-enhance" checked /><span>日本語プロンプトを英語に整形（歌詞は原文維持）</span></label>
+              <span class="spacer"></span>
+              <button class="btn btn-primary btn-lg" id="generate">
+                <span class="btn-text">音楽を生成</span>
+                <span class="btn-loading"><span class="spinner"></span>生成中...</span>
+              </button>
+            </div>
+            <p class="hint" style="margin-top:6px">フル尺は生成に数分かかることがあります。まず30秒クリップで方向性を確かめるのがおすすめです。</p>
+          </section>
+
+          <section class="card" id="result-card" style="display:none">
+            <h3>✅ 生成された音楽</h3>
+            <canvas class="wave" id="wave"></canvas>
+            <audio id="result-audio" controls style="width:100%; margin-top:8px"></audio>
+            <div class="row" id="result-meta" style="margin-top:8px"></div>
+            <div class="result-actions">
+              <button class="btn btn-secondary" id="act-download">⬇️ ダウンロード</button>
+              <button class="btn btn-secondary" id="act-pro" style="display:none">🎼 この内容でフル尺を生成</button>
+              <button class="btn btn-secondary" id="act-new">🆕 新しく生成</button>
+            </div>
+            <details id="lyrics-wrap" style="display:none; margin-top:10px"><summary>歌詞</summary><pre id="result-lyrics"></pre></details>
+            <details style="margin-top:10px"><summary>送信したプロンプト</summary><pre id="result-prompt"></pre></details>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script src="/common/ui.js"></script>
+    <script src="/common/history.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

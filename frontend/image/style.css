@@ -1,0 +1,25 @@
+.thread { display: flex; flex-direction: column; gap: 14px; min-height: 240px; }
+.turn { display: flex; flex-direction: column; gap: 6px; max-width: 92%; }
+.turn.user { align-self: flex-end; align-items: flex-end; }
+.turn.assistant { align-self: flex-start; }
+.bubble {
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.turn.user .bubble { background: var(--primary-soft); border-color: transparent; border-bottom-right-radius: 4px; }
+.turn.assistant .bubble { border-bottom-left-radius: 4px; }
+.turn .thumbs img { height: 64px; }
+.gen-image { max-width: 640px; }
+.gen-image .result-media { position: relative; }
+.gen-image .result-media img { cursor: zoom-in; }
+.gen-image .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.gen-image .skeleton { width: 100%; aspect-ratio: 1; max-width: 480px; }
+.composer { position: sticky; bottom: 12px; }
+.composer textarea { min-height: 72px; }
+.composer .thumbs:empty { display: none; }
+.composer .thumbs { margin-bottom: 10px; }
+.turn.error .bubble { background: var(--danger-soft); border-color: transparent; color: var(--danger); }

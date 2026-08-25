@@ -395,7 +395,7 @@ class TTSApp {
     }
 
     // 音声選択肢を特徴と共に定義
-    const voiceOptions = {
+    const voiceOptions = this.buildVoiceGroups() || {
       female: [
         { value: "Kore", label: "Kore - しっかりとした、自信に満ちた女性音声" },
         { value: "Aoede", label: "Aoede - 爽やかで自然な、風のような女性音声" },
@@ -635,6 +635,7 @@ class TTSApp {
     this.startButtonLoading(summarizeBtn);
 
     try {
+      const speakerNames = this.getSpeakerNames();
       const response = await fetch("/api/tts/summarize", {
         method: "POST",
         headers: {
@@ -643,6 +644,7 @@ class TTSApp {
         body: JSON.stringify({
           text: this.extractedContent,
           speaker_mode: speakerMode,
+          speaker_names: speakerNames,
         }),
       });
 
@@ -724,6 +726,7 @@ class TTSApp {
           speaker_mode: speakerMode,
           style: style,
           rate: 1.0,
+          model: this.getModelKey(),
         }),
       });
 
@@ -735,7 +738,7 @@ class TTSApp {
 
       if (result.success) {
         // 音声プレイヤーを表示
-        this.showAudioPlayer(result.audio_data, result.format);
+        this.showAudioPlayer(result.audio_data, result.format, this.extractedContent);
         this.showSuccess(
           `${
             speakerMode === "single" ? "単一話者" : "複数話者"
@@ -763,9 +766,12 @@ class TTSApp {
       // 複数話者要素を動的に取得
       this.getMultipleSpeakerElements();
 
+      const names = this.getSpeakerNames();
       return {
         voiceA: this.voiceSelectA?.value || "Kore",
         voiceB: this.voiceSelectB?.value || "Puck",
+        nameA: names.A,
+        nameB: names.B,
       };
     }
   }
@@ -794,6 +800,7 @@ class TTSApp {
           voice: voiceId,
           text: "こんにちは。これは音声のプレビューです。",
           style: voiceStyleValue,
+          model: this.getModelKey(),
         }),
       });
 
@@ -864,6 +871,7 @@ class TTSApp {
           voice: voiceId,
           text: "こんにちは。これは音声のプレビューです。",
           style: document.getElementById("voice-style-extracted")?.value || "",
+          model: this.getModelKey(),
         }),
       });
 
@@ -954,18 +962,21 @@ class TTSApp {
             speaker_mode: speakerMode,
             voice_settings: voiceSettings,
             style: voiceStyleValue,
+            model: this.getModelKey(),
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const err = await response.json().catch(() => ({}));
+          if (err.error_type === "quota_exceeded" && window.UI) window.UI.quotaPopup(err.error);
+          throw new Error(err.error || `HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
 
         if (result.success) {
           // 音声プレイヤーを表示
-          this.showAudioPlayer(result.audio_data, result.format);
+          this.showAudioPlayer(result.audio_data, result.format, textContent);
           this.showSuccess("音声の生成が完了しました！");
           return; // 成功したので関数を終了
         } else {
@@ -1037,7 +1048,7 @@ class TTSApp {
     }
   }
 
-  showAudioPlayer(audioData, format) {
+  showAudioPlayer(audioData, format, sourceText = "") {
     // Base64デコードしてBlobを作成
     const binaryString = atob(audioData);
     const bytes = new Uint8Array(binaryString.length);
@@ -1045,6 +1056,9 @@ class TTSApp {
       bytes[i] = binaryString.charCodeAt(i);
     }
     const blob = new Blob([bytes], { type: `audio/${format}` });
+    if (window.History && sourceText) {
+      window.History.add({ type: "audio", blob, mime: blob.type, prompt: sourceText.slice(0, 500), meta: { model: this.getModelKey() } });
+    }
 
     // Clean up previous audio URL
     if (this.currentAudioUrl) {
@@ -1188,7 +1202,75 @@ class TTSApp {
     console.log("Success:", message);
   }
 
+  async loadOptions() {
+    try {
+      const res = await fetch("/api/tts/options");
+      const d = await res.json();
+      if (d.voices && d.voices.length) {
+        this.voiceCatalog = d.voices;
+        this.populateVoiceOptions();
+        this.populateMultipleSpeakerVoices();
+      }
+      this.renderStyleTags(d.style_tags || []);
+    } catch (e) {
+      console.warn("TTS options fallback", e);
+      this.renderStyleTags([]);
+    }
+  }
+
+  renderStyleTags(tags) {
+    const wrap = document.getElementById("style-tags");
+    if (!wrap) return;
+    const list = tags.length ? tags : [
+      { tag: "[excitedly]", label: "わくわく" }, { tag: "[whispers]", label: "ささやき" },
+      { tag: "[laughs]", label: "笑う" }, { tag: "[serious]", label: "真剣に" }, { tag: "[very slow]", label: "ゆっくり" },
+    ];
+    wrap.innerHTML = "";
+    list.forEach((t) => {
+      const c = document.createElement("span");
+      c.className = "chip";
+      c.title = t.tag;
+      c.textContent = `${t.label} ${t.tag}`;
+      c.addEventListener("click", () => this.insertAtCursor(t.tag + " "));
+      wrap.appendChild(c);
+    });
+  }
+
+  insertAtCursor(text) {
+    const ta = this.textInput;
+    const s = ta.selectionStart ?? ta.value.length, e = ta.selectionEnd ?? s;
+    ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+    ta.selectionStart = ta.selectionEnd = s + text.length;
+    ta.focus();
+    this.updateCharacterCount();
+    this.updateGenerateButton();
+  }
+
+  getModelKey() {
+    return document.getElementById("tts-model")?.value || "flash-3.1";
+  }
+
+  getSpeakerNames() {
+    return {
+      A: (document.getElementById("speaker-name-a")?.value || "話者A").trim() || "話者A",
+      B: (document.getElementById("speaker-name-b")?.value || "話者B").trim() || "話者B",
+    };
+  }
+
+  buildVoiceGroups() {
+    // API から取得した 30 音声（取得前は従来の固定リスト）
+    if (this.voiceCatalog) {
+      const toOpt = (v) => ({ value: v.name, label: `${v.name} - ${v.trait}` });
+      return {
+        female: this.voiceCatalog.filter((v) => v.gender === "female").map(toOpt),
+        male: this.voiceCatalog.filter((v) => v.gender !== "female").map(toOpt),
+      };
+    }
+    return null;
+  }
+
   init() {
+    this.loadOptions();
     this.updateCharacterCount();
 
     // 初期状態でテキスト入力モードを選択
@@ -1305,9 +1387,10 @@ class TTSApp {
     // 音声選択要素を動的に取得
     const voiceSelect = document.getElementById("voice-select");
     if (!voiceSelect) return;
+    const prev = voiceSelect.value;
 
     // 音声選択肢を特徴と共に定義
-    const voiceOptions = {
+    const voiceOptions = this.buildVoiceGroups() || {
       female: [
         { value: "Kore", label: "Kore - しっかりとした、自信に満ちた女性音声" },
         { value: "Aoede", label: "Aoede - 爽やかで自然な、風のような女性音声" },
@@ -1397,12 +1480,12 @@ class TTSApp {
     voiceSelect.appendChild(maleOptgroup);
 
     // デフォルト選択
-    voiceSelect.value = "Puck";
+    voiceSelect.value = prev || "Puck";
   }
 
   populateMultipleSpeakerVoices() {
     // 音声選択肢を特徴と共に定義
-    const voiceOptions = {
+    const voiceOptions = this.buildVoiceGroups() || {
       female: [
         { value: "Kore", label: "Kore - しっかりとした、自信に満ちた女性音声" },
         { value: "Aoede", label: "Aoede - 爽やかで自然な、風のような女性音声" },

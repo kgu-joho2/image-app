@@ -3,72 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gemini Text-to-Speech</title>
+    <title>音声生成 - Gemini Studio</title>
+    <link rel="stylesheet" href="/common/base.css" />
     <link rel="stylesheet" href="style.css" />
+    <script src="/common/nav.js"></script>
   </head>
   <body>
     <div class="tts-container">
       <div class="header">
-        <h1>Text-to-Speech</h1>
-        <p>テキストや文書を自然な音声に変換</p>
+        <h1>🗣️ 音声生成</h1>
+        <p>Gemini TTS — 30種類の声と感情タグで、テキストや文書を自然な音声に</p>
       </div>
-      <nav
-        class="navigation"
-        style="
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border-radius: 12px;
-          padding: 12px 16px;
-          margin-bottom: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        "
-      >
-        <div
-          class="nav-links"
-          style="display: flex; gap: 20px; justify-content: center"
-        >
-          <a
-            href="../index.html"
-            class="nav-link"
-            style="
-              color: white;
-              text-decoration: none;
-              padding: 8px 16px;
-              border-radius: 8px;
-              transition: all 0.3s ease;
-              font-weight: 500;
-            "
-            >画像生成</a
-          >
-          <a
-            href="./index.html"
-            class="nav-link active"
-            style="
-              color: white;
-              text-decoration: none;
-              padding: 8px 16px;
-              border-radius: 8px;
-              transition: all 0.3s ease;
-              font-weight: 600;
-              background: rgba(255, 255, 255, 0.2);
-            "
-            >TTS</a
-          >
-          <a
-            href="../video/index.html"
-            class="nav-link"
-            style="
-              color: white;
-              text-decoration: none;
-              padding: 8px 16px;
-              border-radius: 8px;
-              transition: all 0.3s ease;
-              font-weight: 500;
-            "
-            >/video</a
-          >
-        </div>
-      </nav>
 
       <!-- モード選択 -->
       <div class="mode-selection">
@@ -95,6 +40,10 @@
           </label>
         </div>
 
+        <div class="tag-toolbar" id="tag-toolbar">
+          <span class="hint">感情・話し方タグを挿入:</span>
+          <div class="chips" id="style-tags"></div>
+        </div>
         <div class="text-area-container">
           <textarea
             id="text-input"
@@ -161,6 +110,15 @@
       <div class="voice-settings" id="text-voice-settings">
         <h3>音声設定</h3>
 
+        <div class="setting-group" style="margin-bottom: 12px">
+          <label for="tts-model">モデル</label>
+          <select id="tts-model">
+            <option value="flash-3.1">Gemini 3.1 Flash TTS（最新・プレビュー）</option>
+            <option value="flash">Gemini 2.5 Flash TTS（安定）</option>
+            <option value="pro">Gemini 2.5 Pro TTS（高品質）</option>
+          </select>
+          <small>プレビュー版が使えない場合は自動的に 2.5 Flash にフォールバックします</small>
+        </div>
         <div class="settings-grid">
           <!-- 単一話者設定 -->
           <div id="single-voice-settings" class="voice-config">
@@ -182,7 +140,7 @@
             style="display: none"
           >
             <div class="speaker-config">
-              <h4>話者A</h4>
+              <input type="text" id="speaker-name-a" class="speaker-name" value="話者A" placeholder="話者名" />
               <select id="voice-select-a">
                 <!-- JavaScriptで動的に生成されます -->
               </select>
@@ -191,7 +149,7 @@
               </button>
             </div>
             <div class="speaker-config">
-              <h4>話者B</h4>
+              <input type="text" id="speaker-name-b" class="speaker-name" value="話者B" placeholder="話者名" />
               <select id="voice-select-b">
                 <!-- JavaScriptで動的に生成されます -->
               </select>
@@ -207,7 +165,7 @@
             <input
               type="text"
               id="voice-style"
-              placeholder="例: 明るく、ゆっくりと、丁寧に"
+              placeholder="例: 明るく、ゆっくりと、丁寧に（ニュース原稿を読むように）"
             />
             <small>自然言語で音声のスタイルを指定できます</small>
           </div>
@@ -270,6 +228,8 @@
       </div>
     </div>
 
+    <script src="/common/ui.js"></script>
+    <script src="/common/history.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

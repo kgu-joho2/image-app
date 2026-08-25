@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ギャラリー - Gemini Studio</title>
+    <link rel="stylesheet" href="/common/base.css" />
+    <script src="/common/nav.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <div class="page-head">
+        <h1>🗂️ ギャラリー</h1>
+        <p>このブラウザで生成した画像・動画・音声・音楽の履歴です（サーバーには保存されません）。</p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="segmented" id="filter">
+            <label><input type="radio" name="type" value="" checked />すべて</label>
+            <label><input type="radio" name="type" value="image" />🖼️ 画像</label>
+            <label><input type="radio" name="type" value="video" />🎬 動画</label>
+            <label><input type="radio" name="type" value="audio" />🗣️ 音声</label>
+            <label><input type="radio" name="type" value="music" />🎵 音楽</label>
+          </div>
+          <span class="spacer"></span>
+          <span class="hint" id="count"></span>
+          <button class="btn btn-danger btn-sm" id="clear-all">すべて削除</button>
+        </div>
+        <div class="gallery-grid" id="grid" style="margin-top:14px"></div>
+        <p class="hint" id="empty" style="display:none; text-align:center; padding: 30px 0">まだ生成物がありません。</p>
+      </div>
+    </main>
+
+    <script src="/common/ui.js"></script>
+    <script src="/common/history.js"></script>
+    <script>
+      (function () {
+        const grid = document.getElementById("grid"), empty = document.getElementById("empty"), countEl = document.getElementById("count");
+        const ICON = { image: "🖼️", video: "🎬", audio: "🗣️", music: "🎵" };
+        const LABEL = { image: "画像", video: "動画", audio: "音声", music: "音楽" };
+        let urls = [];
+
+        async function render() {
+          urls.forEach(URL.revokeObjectURL); urls = [];
+          const type = document.querySelector('input[name="type"]:checked').value;
+          const rows = await History.list({ type: type || undefined });
+          grid.innerHTML = "";
+          empty.style.display = rows.length ? "none" : "block";
+          countEl.textContent = `${rows.length}件`;
+          rows.forEach((r) => {
+            const el = document.createElement("div");
+            el.className = "gallery-item";
+            let media;
+            if (r.type === "image") {
+              const u = URL.createObjectURL(r.thumb || r.blob); urls.push(u);
+              media = `<img src="${u}" loading="lazy" />`;
+            } else if (r.type === "video") {
+              const u = URL.createObjectURL(r.blob); urls.push(u);
+              media = `<video src="${u}" muted preload="metadata"></video>`;
+            } else media = `<span class="icon">${ICON[r.type]}</span>`;
+            el.innerHTML = `<div class="media">${media}</div>
+              <div class="meta"><div class="p">${UI.escapeHtml(r.prompt || "(プロンプトなし)")}</div>${ICON[r.type]} ${new Date(r.created).toLocaleString("ja-JP")}</div>`;
+            el.addEventListener("click", () => open(r));
+            grid.appendChild(el);
+          });
+        }
+
+        function open(r) {
+          const u = URL.createObjectURL(r.blob);
+          const box = document.createElement("div");
+          const media = r.type === "image" ? `<img src="${u}" style="max-height:60vh; display:block; margin:0 auto" />`
+            : r.type === "video" ? `<video src="${u}" controls style="width:100%; max-height:60vh"></video>`
+            : `<audio src="${u}" controls style="width:100%"></audio>`;
+          const meta = r.meta || {};
+          const reuse = { image: ["image", "✏️ 画像ページで編集"], video: null, audio: null, music: null }[r.type];
+          box.innerHTML = `
+            <div class="row" style="margin-bottom:10px"><span class="badge primary">${LABEL[r.type]}</span><span class="badge">${UI.escapeHtml(meta.model || "")}</span><span class="hint">${new Date(r.created).toLocaleString("ja-JP")}</span></div>
+            ${media}
+            <p style="margin-top:12px; white-space:pre-wrap">${UI.escapeHtml(r.prompt || "")}</p>
+            ${meta.lyrics ? `<details><summary>歌詞</summary><pre>${UI.escapeHtml(meta.lyrics)}</pre></details>` : ""}
+            ${meta.prompt_used ? `<details><summary>送信したプロンプト</summary><pre>${UI.escapeHtml(meta.prompt_used)}</pre></details>` : ""}
+            <div class="result-actions" style="margin-top:12px">
+              <button class="btn btn-primary" data-act="dl">⬇️ ダウンロード</button>
+              ${reuse ? `<button class="btn btn-secondary" data-act="reuse">${reuse[1]}</button>` : ""}
+              ${r.type === "image" ? `<button class="btn btn-secondary" data-act="video">🎬 動画にする</button><button class="btn btn-secondary" data-act="music">🎵 音楽にする</button>` : ""}
+              <button class="btn btn-secondary" data-act="copy">📋 プロンプトをコピー</button>
+              <span class="spacer"></span>
+              <button class="btn btn-danger" data-act="del">🗑️ 削除</button>
+            </div>`;
+          const m = UI.modal(box);
+          box.addEventListener("click", async (e) => {
+            const act = e.target.closest("[data-act]")?.dataset.act;
+            if (!act) return;
+            if (act === "dl") UI.download(r.blob, `${r.type}_${new Date(r.created).toISOString().slice(0, 19).replace(/[-:T]/g, "")}.${UI.extFromMime(r.mime || r.blob.type)}`);
+            if (act === "reuse") History.sendTo(reuse[0], { blob: r.blob, mime: r.mime, prompt: r.prompt });
+            if (act === "video") History.sendTo("video", { blob: r.blob, mime: r.mime, prompt: r.prompt });
+            if (act === "music") History.sendTo("music", { blob: r.blob, mime: r.mime, prompt: r.prompt });
+            if (act === "copy") { await navigator.clipboard.writeText(r.prompt || ""); UI.toast("コピーしました", "success", 1500); }
+            if (act === "del") { if (confirm("この項目を削除しますか？")) { await History.remove(r.id); m.close(); render(); } }
+          });
+        }
+
+        document.querySelectorAll('input[name="type"]').forEach((r) => r.addEventListener("change", render));
+        document.getElementById("clear-all").addEventListener("click", async () => {
+          if (confirm("履歴をすべて削除しますか？この操作は取り消せません。")) { await History.clear(); render(); }
+        });
+        render();
+      })();
+    </script>
+  </body>
+</html>

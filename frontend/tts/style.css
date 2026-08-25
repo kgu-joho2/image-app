@@ -8,9 +8,9 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  background: #f0f8ff; /* AliceBlue - 画像生成アプリと統一 */
+  background: var(--bg); /* AliceBlue - 画像生成アプリと統一 */
   min-height: 100vh;
-  color: #333;
+  color: var(--text);
   line-height: 1.6;
 }
 
@@ -26,21 +26,21 @@ body {
   text-align: center;
   margin-bottom: 2rem;
   padding: 2rem 0;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface);
   border-radius: 16px;
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .header h1 {
-  color: #007bff; /* プライマリブルー - 画像生成アプリと統一 */
+  color: var(--primary); /* プライマリブルー - 画像生成アプリと統一 */
   margin-bottom: 0.5rem;
   font-size: 2.5rem;
   font-weight: 700;
 }
 
 .header p {
-  color: #666;
+  color: var(--text-muted);
   font-size: 1.1rem;
 }
 
@@ -56,18 +56,18 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.95); /* 白背景に変更 */
+  background: var(--surface); /* 白背景に変更 */
   padding: 12px 20px;
   border-radius: 25px;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: #333; /* テキスト色も変更 */
-  border: 2px solid #cce0ff; /* ライトブルーボーダー */
+  color: var(--text); /* テキスト色も変更 */
+  border: 2px solid var(--border); /* ライトブルーボーダー */
 }
 
 .mode-option:hover {
   background: rgba(208, 234, 255, 0.3); /* d0eaff hover */
-  border-color: #007bff;
+  border-color: var(--primary);
 }
 
 .mode-option input[type="radio"] {
@@ -79,14 +79,14 @@ body {
 }
 
 .mode-option:has(input[type="radio"]:checked) {
-  background: #d0eaff; /* ライトブルー選択状態 */
-  border-color: #007bff;
-  color: #007bff;
+  background: var(--primary-soft); /* ライトブルー選択状態 */
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* Input Sections */
 .input-section {
-  background: rgba(255, 255, 255, 0.95); /* 画像生成アプリと統一 */
+  background: var(--surface); /* 画像生成アプリと統一 */
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 24px;
@@ -97,9 +97,9 @@ body {
 textarea {
   width: 100%;
   padding: 16px;
-  border: 1px solid #cce0ff; /* ライトブルーボーダー - 画像生成アプリと統一 */
+  border: 1px solid var(--border); /* ライトブルーボーダー - 画像生成アプリと統一 */
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--surface);
   font-family: inherit;
   font-size: 1rem;
   line-height: 1.6;
@@ -109,7 +109,7 @@ textarea {
 
 textarea:focus {
   outline: none;
-  border-color: #007bff; /* プライマリブルー */
+  border-color: var(--primary); /* プライマリブルー */
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
@@ -117,19 +117,19 @@ textarea:focus {
 select {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid #cce0ff; /* ライトブルーボーダー */
+  border: 1px solid var(--border); /* ライトブルーボーダー */
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
   font-family: inherit;
   font-size: 1rem;
-  color: #333;
+  color: var(--text);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 select:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
@@ -137,9 +137,9 @@ select:focus {
 input[type="text"] {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid #cce0ff; /* ライトブルーボーダー */
+  border: 1px solid var(--border); /* ライトブルーボーダー */
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
   font-family: inherit;
   font-size: 1rem;
   transition: all 0.3s ease;
@@ -147,7 +147,7 @@ input[type="text"] {
 
 input[type="text"]:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
@@ -168,11 +168,11 @@ input[type="text"]:focus {
   cursor: pointer;
   transition: all 0.3s ease;
   border: 2px solid transparent;
-  background: #f8f9fa;
+  background: var(--surface-2);
 }
 
 .speaker-option:hover {
-  background: #e9ecef;
+  background: var(--surface-3);
 }
 
 .speaker-option input[type="radio"] {
@@ -180,9 +180,9 @@ input[type="text"]:focus {
 }
 
 .speaker-option:has(input[type="radio"]:checked) {
-  background: #d0eaff; /* ライトブルー選択状態 */
-  border-color: #007bff;
-  color: #007bff;
+  background: var(--primary-soft); /* ライトブルー選択状態 */
+  border-color: var(--primary);
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -195,7 +195,7 @@ input[type="text"]:focus {
   text-align: right;
   margin-top: 8px;
   font-size: 14px;
-  color: #666;
+  color: var(--text-muted);
 }
 
 /* Upload Area */
@@ -204,23 +204,23 @@ input[type="text"]:focus {
 }
 
 .upload-zone {
-  border: 2px dashed #cce0ff; /* ライトブルーボーダー - 画像生成アプリと統一 */
+  border: 2px dashed var(--border); /* ライトブルーボーダー - 画像生成アプリと統一 */
   border-radius: 16px;
   padding: 3rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--surface-2);
 }
 
 .upload-zone:hover {
-  border-color: #007bff; /* プライマリブルー */
+  border-color: var(--primary); /* プライマリブルー */
   background: rgba(208, 234, 255, 0.2); /* d0eaff with opacity */
   transform: translateY(-2px);
 }
 
 .upload-zone.dragover {
-  border-color: #007bff;
+  border-color: var(--primary);
   background: rgba(208, 234, 255, 0.3);
   transform: scale(1.02);
 }
@@ -236,18 +236,18 @@ input[type="text"]:focus {
 
 .upload-zone p {
   margin: 8px 0;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .supported-formats {
   font-size: 12px;
-  color: #999;
+  color: var(--text-muted);
 }
 
 /* File Preview */
 .file-preview {
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
@@ -269,12 +269,12 @@ input[type="text"]:focus {
 
 .file-name {
   font-weight: 600;
-  color: #333;
+  color: var(--text);
 }
 
 .file-size {
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .remove-file-btn {
@@ -296,22 +296,22 @@ input[type="text"]:focus {
 .extracted-content {
   margin-top: 20px;
   padding: 20px;
-  background: #f8f9fa;
+  background: var(--surface-2);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
 }
 
 .extracted-content h3 {
   margin-bottom: 16px;
-  color: #333;
+  color: var(--text);
 }
 
 .content-preview {
   max-height: 200px;
   overflow-y: auto;
   padding: 12px;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
   margin-bottom: 16px;
   font-size: 14px;
@@ -325,7 +325,7 @@ input[type="text"]:focus {
 
 /* Voice Settings */
 .voice-settings {
-  background: rgba(255, 255, 255, 0.95); /* 画像生成アプリと統一 */
+  background: var(--surface); /* 画像生成アプリと統一 */
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 24px;
@@ -334,7 +334,7 @@ input[type="text"]:focus {
 
 .voice-settings h3 {
   margin-bottom: 20px;
-  color: #333;
+  color: var(--text);
   font-size: 1.3rem;
 }
 
@@ -349,15 +349,15 @@ input[type="text"]:focus {
 }
 
 .speaker-config {
-  background: #f8f9fa;
+  background: var(--surface-2);
   padding: 16px;
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
 }
 
 .speaker-config h4 {
   margin-bottom: 12px;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .setting-group {
@@ -368,13 +368,13 @@ input[type="text"]:focus {
 
 .setting-group label {
   font-weight: 600;
-  color: #555;
+  color: var(--text-muted);
 }
 
 .setting-group select,
 .setting-group input[type="text"] {
   padding: 10px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 14px;
   transition: border-color 0.3s ease;
@@ -383,11 +383,11 @@ input[type="text"]:focus {
 .setting-group select:focus,
 .setting-group input[type="text"]:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--primary);
 }
 
 .setting-group small {
-  color: #666;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -409,7 +409,7 @@ input[type="text"]:focus {
 }
 
 .btn-primary {
-  background-color: #007bff; /* プライマリブルー - 画像生成アプリと統一 */
+  background-color: var(--primary); /* プライマリブルー - 画像生成アプリと統一 */
   color: white;
 }
 
@@ -419,20 +419,20 @@ input[type="text"]:focus {
 }
 
 .btn-secondary {
-  background-color: #e9ecef; /* 画像生成アプリと統一 */
-  color: #495057;
-  border: 1px solid #ced4da;
+  background-color: var(--surface-3); /* 画像生成アプリと統一 */
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #dee2e6; /* 画像生成アプリと統一 */
+  background-color: var(--border); /* 画像生成アプリと統一 */
   transform: translateY(-2px);
 }
 
 .btn-preview {
-  background-color: #d0eaff; /* ライトブルー - 画像生成アプリと統一 */
-  color: #007bff;
-  border: 1px solid #cce0ff;
+  background-color: var(--primary-soft); /* ライトブルー - 画像生成アプリと統一 */
+  color: var(--primary);
+  border: 1px solid var(--border);
   font-size: 0.9rem;
   padding: 8px 16px;
   border-radius: 16px;
@@ -479,7 +479,7 @@ input[type="text"]:focus {
 
 /* Audio Section */
 .audio-section {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface);
   border-radius: 16px;
   padding: 24px;
   margin-top: 24px;
@@ -487,7 +487,7 @@ input[type="text"]:focus {
 }
 
 .audio-section h3 {
-  color: #007bff; /* プライマリブルー */
+  color: var(--primary); /* プライマリブルー */
   margin-bottom: 16px;
   font-size: 1.3rem;
   font-weight: 600;
@@ -504,7 +504,7 @@ input[type="text"]:focus {
 .audio-player audio {
   width: 100%;
   max-width: 500px;
-  background: #f8f9fa;
+  background: var(--surface-2);
   border-radius: 12px;
 }
 
@@ -519,7 +519,7 @@ input[type="text"]:focus {
 
 /* Processing Status */
 .status-section {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--surface);
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 24px;
@@ -549,14 +549,14 @@ input[type="text"]:focus {
 
 .status-step.completed {
   opacity: 1;
-  color: #4caf50;
+  color: var(--success);
 }
 
 .step-icon {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #e0e0e0;
+  background: var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -566,12 +566,12 @@ input[type="text"]:focus {
 }
 
 .status-step.active .step-icon {
-  background: #2196f3;
+  background: var(--primary);
   color: white;
 }
 
 .status-step.completed .step-icon {
-  background: #4caf50;
+  background: var(--success);
   color: white;
 }
 
@@ -659,9 +659,9 @@ input[type="text"]:focus {
 .extracted-content-editor {
   width: 100%;
   padding: 1rem;
-  border: 2px solid #cce0ff; /* ライトブルーボーダー - 画像生成アプリと統一 */
+  border: 2px solid var(--border); /* ライトブルーボーダー - 画像生成アプリと統一 */
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
   font-family: inherit;
   font-size: 0.95rem;
   line-height: 1.5;
@@ -672,6 +672,13 @@ input[type="text"]:focus {
 
 .extracted-content-editor:focus {
   outline: none;
-  border-color: #007bff; /* プライマリブルー */
+  border-color: var(--primary); /* プライマリブルー */
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
+
+
+/* ---- 共通デザインシステムへの追従 ---- */
+.tts-container { box-shadow: none; background: transparent; width: 100%; max-width: 1000px; }
+.tag-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.speaker-name { margin-bottom: 6px; font-weight: 600; }
+.speaker-config { display: flex; flex-direction: column; gap: 6px; }

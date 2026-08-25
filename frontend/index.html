@@ -3,115 +3,69 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gemini Image Chat</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>Gemini Studio</title>
+    <link rel="stylesheet" href="/common/base.css" />
+    <script src="/common/nav.js"></script>
   </head>
   <body>
-    <!-- Navigation -->
-    <nav
-      class="navigation"
-      style="
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 12px;
-        padding: 16px 24px;
-        margin-bottom: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-      "
-    >
-      <div
-        class="nav-links"
-        style="display: flex; gap: 20px; justify-content: center"
-      >
-        <a
-          href="index.html"
-          class="nav-link active"
-          style="
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            background: rgba(255, 255, 255, 0.2);
-          "
-          >画像生成</a
-        >
-        <a
-          href="tts/index.html"
-          class="nav-link"
-          style="
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 500;
-          "
-          >TTS</a
-        >
-        <a
-          href="video/index.html"
-          class="nav-link"
-          style="
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            font-weight: 500;
-          "
-          >/video</a
-        >
+    <main class="page">
+      <div class="page-head" style="text-align:center; padding: 24px 0 8px">
+        <h1 style="font-size:2rem">✨ Gemini Studio</h1>
+        <p>Gemini API で画像・動画・音声・音楽を生成するツール集</p>
       </div>
-    </nav>
 
-    <div class="chat-container">
-      <div class="chat-box" id="chat-box">
-        <!-- Chat messages will appear here -->
-        <div class="message assistant">
-          <p>生成したい画像のイメージを入力してください。</p>
+      <div class="launcher">
+        <a href="/image/">
+          <div class="icon">🖼️</div>
+          <h2>画像生成</h2>
+          <p>Gemini Image（Nano Banana）。4K・アスペクト比指定・会話で段階的に編集。</p>
+        </a>
+        <a href="/video/">
+          <div class="icon">🎬</div>
+          <h2>動画生成</h2>
+          <p>Veo 3.1。テキスト/画像から音声付き動画。最初と最後のフレーム、参照画像、延長。</p>
+        </a>
+        <a href="/tts/">
+          <div class="icon">🗣️</div>
+          <h2>音声生成</h2>
+          <p>Gemini TTS。30種類の声、感情タグ、2人の会話、文書からの読み上げ。</p>
+        </a>
+        <a href="/music/">
+          <div class="icon">🎵</div>
+          <h2>音楽生成</h2>
+          <p>Lyria 3。ジャンル・楽器・BPMから楽曲を生成。歌詞付きも可。</p>
+        </a>
+      </div>
+
+      <section class="card" style="margin-top: 24px">
+        <div class="row">
+          <h3 style="margin:0">🕘 最近の生成物</h3>
+          <span class="spacer"></span>
+          <a href="/gallery/" class="btn btn-ghost btn-sm">ギャラリーを開く →</a>
         </div>
-      </div>
-      <div class="input-area">
-        <!-- Image Upload Button -->
-        <label for="image-upload" class="upload-button">📎</label>
-        <input
-          type="file"
-          id="image-upload"
-          accept="image/*"
-          multiple
-          style="display: none"
-        />
+        <div class="gallery-grid" id="recent" style="margin-top:12px"></div>
+        <p class="hint" id="recent-empty" style="display:none">まだ生成物はありません。上のツールから始めましょう。</p>
+      </section>
+    </main>
 
-        <!-- Image Preview Area -->
-        <div
-          id="image-preview-area"
-          style="
-            display: none;
-            margin-right: 10px;
-            position: relative;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-          "
-        >
-          <!-- multiple previews rendered by JS -->
-          <button id="clear-image-button" class="clear-image-btn">×</button>
-        </div>
-
-        <textarea
-          id="user-input"
-          placeholder="イメージを入力..."
-          rows="1"
-        ></textarea>
-        <button id="send-button">送信</button>
-      </div>
-
-      <!-- Add New Chat button INSIDE the container, after input-area -->
-      <button id="new-chat-button" style="display: none">新しいチャット</button>
-    </div>
-
-    <script src="script.js"></script>
+    <script src="/common/ui.js"></script>
+    <script src="/common/history.js"></script>
+    <script>
+      (async () => {
+        const rows = (await History.list()).slice(0, 8);
+        const grid = document.getElementById("recent");
+        document.getElementById("recent-empty").style.display = rows.length ? "none" : "block";
+        const ICON = { image: "🖼️", video: "🎬", audio: "🗣️", music: "🎵" };
+        rows.forEach((r) => {
+          const el = document.createElement("a");
+          el.className = "gallery-item"; el.href = "/gallery/"; el.style.textDecoration = "none"; el.style.color = "inherit";
+          let media = `<span class="icon">${ICON[r.type]}</span>`;
+          if (r.type === "image") media = `<img src="${URL.createObjectURL(r.thumb || r.blob)}" />`;
+          if (r.type === "video") media = `<video src="${URL.createObjectURL(r.blob)}" muted preload="metadata"></video>`;
+          el.innerHTML = `<div class="media">${media}</div><div class="meta"><div class="p">${UI.escapeHtml(r.prompt || "")}</div>${ICON[r.type]} ${new Date(r.created).toLocaleDateString("ja-JP")}</div>`;
+          grid.appendChild(el);
+        });
+      })();
+    </script>
   </body>
 </html>

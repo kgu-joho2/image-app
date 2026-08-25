@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>画像生成 - Gemini Studio</title>
+    <link rel="stylesheet" href="/common/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="/common/nav.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <div class="page-head">
+        <h1>🖼️ 画像生成</h1>
+        <p>Gemini Image（Nano Banana）でテキストから画像を生成・編集。会話を続けて段階的に仕上げられます。</p>
+      </div>
+
+      <div class="layout">
+        <aside class="stack">
+          <section class="card">
+            <h3>⚙️ 生成設定</h3>
+            <div class="stack">
+              <div class="field">
+                <label>モデル</label>
+                <div class="segmented" id="model-seg">
+                  <label><input type="radio" name="model" value="flash-lite" />高速</label>
+                  <label><input type="radio" name="model" value="flash" checked />標準</label>
+                  <label><input type="radio" name="model" value="pro" />高品質</label>
+                </div>
+                <div class="hint" id="model-hint"></div>
+              </div>
+              <div class="field">
+                <label>アスペクト比</label>
+                <div class="chips" id="aspect-chips"></div>
+              </div>
+              <div class="field">
+                <label>解像度</label>
+                <div class="chips" id="size-chips"></div>
+              </div>
+              <label class="check"><input type="checkbox" id="opt-enhance" checked /><span>日本語プロンプトを英語に整形（Gemini）</span></label>
+              <label class="check"><input type="checkbox" id="opt-search" /><span>Google検索でグラウンディング</span></label>
+              <label class="check"><input type="checkbox" id="opt-thinking" /><span>Thinking（複雑な構図・文字向け、時間がかかります）</span></label>
+            </div>
+          </section>
+
+          <section class="card">
+            <h3>💬 セッション</h3>
+            <p class="hint" id="session-hint">生成後に続けて指示すると、直前の画像を編集します。</p>
+            <div class="row">
+              <span class="badge" id="session-badge">新規</span>
+              <span class="spacer"></span>
+              <button class="btn btn-secondary btn-sm" id="new-session">新しいセッション</button>
+            </div>
+          </section>
+        </aside>
+
+        <section class="stack">
+          <div class="card" id="thread-card">
+            <div id="thread" class="thread">
+              <div class="turn assistant">
+                <div class="bubble">生成したい画像のイメージを入力してください。画像を添付すると、その画像をもとに編集・合成します。</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card composer">
+            <div class="thumbs" id="input-thumbs"></div>
+            <textarea id="prompt" rows="3" placeholder="例: 夕暮れの京都の路地を歩く着物姿の女性、フィルム写真風、看板に「甘味処」の文字"></textarea>
+            <div class="row">
+              <label class="upload-btn" for="image-upload">📎 画像を添付</label>
+              <input type="file" id="image-upload" accept="image/*" multiple style="display: none" />
+              <span class="hint" id="upload-hint"></span>
+              <span class="spacer"></span>
+              <button class="btn btn-primary" id="send">
+                <span class="btn-text">生成する</span>
+                <span class="btn-loading"><span class="spinner"></span>生成中...</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="/common/ui.js"></script>
+    <script src="/common/history.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
