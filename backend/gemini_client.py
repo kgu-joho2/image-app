@@ -91,7 +91,7 @@ def _interactions_rest(payload: dict) -> dict:
         raise RuntimeError(f"HTTP {he.code}: {detail}")
 
 
-def interactions_create(model: str, input_payload, **kwargs) -> dict:
+def interactions_create(model: str, input_payload, rest: bool = False, **kwargs) -> dict:
     """
     client.interactions.create を呼び、結果を正規化した dict で返す:
       {
@@ -102,9 +102,10 @@ def interactions_create(model: str, input_payload, **kwargs) -> dict:
         "raw": dict,
       }
     kwargs: response_format, previous_interaction_id, tools, generation_config など
+    rest: True なら SDK を使わず REST で呼ぶ（SDK が未対応のフィールドを送る場合）
     """
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
-    interactions_api = getattr(client, "interactions", None)
+    interactions_api = None if rest else getattr(client, "interactions", None)
     raw = None
     interaction = None
 
@@ -116,7 +117,8 @@ def interactions_create(model: str, input_payload, **kwargs) -> dict:
             except Exception:
                 raw = None
     else:
-        print("google-genai SDK に interactions が無いため REST で呼び出します")
+        if not rest:
+            print("google-genai SDK に interactions が無いため REST で呼び出します")
         raw = _interactions_rest({"model": model, "input": input_payload, **kwargs})
 
     result = {"id": None, "text": "", "images": [], "audios": [], "raw": raw or {}}

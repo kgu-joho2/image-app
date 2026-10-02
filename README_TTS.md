@@ -245,7 +245,7 @@ Google Cloud Document AI や Vision API を使用することで、より高度�
 
 ### ✅ 完全復旧！利用可能な機能
 
-**Gemini 2.5 TTS API が正常に動作しています！**
+**Gemini 3.8 Flash-Lite / Flash TTS が正常に動作しています！**
 
 - ✅ **音声プレビュー機能**: 30 種類の音声オプションで音声プレビューが可能
 - ✅ **音声生成機能**: 単一話者・複数話者対応の音声生成
@@ -259,8 +259,9 @@ Google Cloud Document AI や Vision API を使用することで、より高度�
 
 **対応モデル**:
 
-- `gemini-2.5-flash-preview-tts`
-- `gemini-2.5-pro-preview-tts`
+- `gemini-3.8-flash-lite-tts`（デフォルト）
+- `gemini-3.8-flash-tts`
+- `gemini-3.1-flash-tts-preview`
 
 **音声オプション（30 種類）**:
 
@@ -275,7 +276,7 @@ Google Cloud Document AI や Vision API を使用することで、より高度�
 
 ### ⚠️ 重要なお知らせ
 
-**Preview 版について**: Gemini 2.5 TTS API はまだ Preview 版です。正式版リリースまでに仕様変更の可能性があります。
+**Preview 版について**: `gemini-3.1-flash-tts-preview` は Preview 版です。正式版リリースまでに仕様変更の可能性があります。
 
 ### 🚀 使用方法
 

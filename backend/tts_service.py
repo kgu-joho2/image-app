@@ -16,15 +16,16 @@ from PIL import Image
 import speech_recognition as sr
 import time
 
-from gemini_client import generate_text
+from gemini_client import generate_text, interactions_create
 
 # https://ai.google.dev/gemini-api/docs/speech-generation
+# turn_annotations: 2話者会話はセリフごとに speech_metadata.speaker の指定が必須（Interactions API で呼ぶ）
 TTS_MODELS = {
-    "flash-3.1": {"id": "gemini-3.1-flash-tts-preview", "label": "Gemini 3.1 Flash TTS (プレビュー・最新)"},
-    "flash":     {"id": "gemini-2.5-flash-preview-tts", "label": "Gemini 2.5 Flash TTS (安定)"},
-    "pro":       {"id": "gemini-2.5-pro-preview-tts",   "label": "Gemini 2.5 Pro TTS (高品質)"},
+    "flash-lite-3.8": {"id": "gemini-3.8-flash-lite-tts",    "label": "Gemini 3.8 Flash-Lite TTS (高速・低コスト)", "turn_annotations": True},
+    "flash-3.8":      {"id": "gemini-3.8-flash-tts",         "label": "Gemini 3.8 Flash TTS (高品質)", "turn_annotations": True},
+    "flash-3.1":      {"id": "gemini-3.1-flash-tts-preview", "label": "Gemini 3.1 Flash TTS (プレビュー)"},
 }
-DEFAULT_TTS_MODEL = "flash-3.1"
+DEFAULT_TTS_MODEL = "flash-lite-3.8"
 
 # 30 音声 (name, 特徴, 傾向)
 VOICES = [
@@ -392,18 +393,88 @@ class TTSService:
     def _resolve_model(self, model_key: Optional[str]) -> str:
         return TTS_MODELS.get(model_key or DEFAULT_TTS_MODEL, TTS_MODELS[DEFAULT_TTS_MODEL])["id"]
 
-    def _call_tts(self, model_id: str, prompt: str, speech_config: types.SpeechConfig):
-        """generate_content を呼ぶ。500系は1回だけ再試行。"""
-        cfg = types.GenerateContentConfig(response_modalities=["AUDIO"], speech_config=speech_config)
+    @staticmethod
+    def _needs_turn_annotations(model_id: str) -> bool:
+        return any(m["id"] == model_id and m.get("turn_annotations") for m in TTS_MODELS.values())
+
+    @staticmethod
+    def _retry_once(call):
+        """500系は1回だけ再試行。"""
         try:
-            return self.client.models.generate_content(model=model_id, contents=prompt, config=cfg)
+            return call()
         except Exception as api_error:
             s = str(api_error)
             if "500" in s or "INTERNAL" in s or "503" in s:
                 print(f"TTS API error {s[:120]} → 3秒後に再試行")
                 time.sleep(3)
-                return self.client.models.generate_content(model=model_id, contents=prompt, config=cfg)
+                return call()
             raise
+
+    def _call_tts(self, model_id: str, prompt: str, speech_config: types.SpeechConfig) -> Optional[bytes]:
+        """generate_content で音声を生成し、WAV バイト列を返す。"""
+        cfg = types.GenerateContentConfig(response_modalities=["AUDIO"], speech_config=speech_config)
+        response = self._retry_once(
+            lambda: self.client.models.generate_content(model=model_id, contents=prompt, config=cfg))
+        if response and getattr(response, "candidates", None):
+            cand = response.candidates[0]
+            parts = getattr(getattr(cand, "content", None), "parts", None) or []
+            for part in parts:
+                inline = getattr(part, "inline_data", None)
+                if inline is not None and getattr(inline, "data", None):
+                    return wave_file(inline.data)
+                if getattr(part, "text", None):
+                    print(f"TTS: 音声ではなくテキストが返却されました: {part.text[:200]}")
+        return None
+
+    def _call_tts_turns(self, model_id: str, turns: list, speakers: Dict[str, str], style: str) -> Optional[bytes]:
+        """
+        Interactions API で2話者会話を生成し、WAV バイト列を返す。
+        turns: [(話者名, セリフ)], speakers: {話者名: 音声名}
+        google-genai < 2.25 は speech_metadata を正しく送れないため REST で呼ぶ。
+        """
+        content = []
+        for speaker, line in turns:
+            meta = {"type": "speech_metadata", "speaker": speaker}
+            if style:
+                meta["style"] = style
+            content.append({"type": "text", "text": line, "annotations": [meta]})
+        result = self._retry_once(lambda: interactions_create(
+            model_id,
+            [{"type": "user_input", "content": content}],
+            rest=True,
+            response_format={"type": "audio"},
+            generation_config={"speech_config": {
+                "speakers": [{"speaker": s, "voice": v} for s, v in speakers.items()],
+            }},
+        ))
+        if not result["audios"]:
+            if result["text"]:
+                print(f"TTS: 音声ではなくテキストが返却されました: {result['text'][:200]}")
+            return None
+        audio = result["audios"][0]
+        data = base64.b64decode(audio["data"])
+        return data if "wav" in (audio.get("mime_type") or "") else wave_file(data)
+
+    @staticmethod
+    def _split_turns(speaker_text: str, names: list) -> list:
+        """「名前: セリフ」形式の会話を [(名前, セリフ)] に分割する。名前の無い行は直前のセリフに続ける。"""
+        turns = []
+        for line in speaker_text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            for name in names:
+                if line.startswith(name):
+                    rest = line[len(name):].lstrip()
+                    if rest[:1] in (":", "："):
+                        turns.append([name, rest[1:].strip()])
+                        break
+            else:
+                if turns:
+                    turns[-1][1] += "\n" + line
+                else:
+                    turns.append([names[0], line])
+        return [(n, t) for n, t in turns if t]
 
     @staticmethod
     def _voice(name: str) -> types.VoiceConfig:
@@ -446,6 +517,8 @@ class TTSService:
                 # 旧形式（話者A/話者B）で書かれていても指定名に置換
                 speaker_text = speaker_text.replace("話者A:", f"{name_a}:").replace("話者B:", f"{name_b}:")
                 prompt = f"{style_line}以下の会話を{name_a}と{name_b}の2人の話者で読み上げてください:\n{speaker_text}"
+                turns = self._split_turns(speaker_text, [name_a, name_b])
+                turn_style = style_line.replace("\n\n", " ").strip()
                 speech_config = types.SpeechConfig(
                     multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
                         speaker_voice_configs=[
@@ -455,33 +528,27 @@ class TTSService:
                     )
                 )
 
+            def synthesize(mid: str) -> Optional[bytes]:
+                if speaker_mode != "single" and self._needs_turn_annotations(mid):
+                    return self._call_tts_turns(mid, turns, {name_a: voice_a, name_b: voice_b}, turn_style)
+                return self._call_tts(mid, prompt, speech_config)
+
             try:
-                response = self._call_tts(model_id, prompt, speech_config)
+                wav = synthesize(model_id)
             except Exception as e:
-                # プレビュー版モデルが使えない場合は安定版へフォールバック
-                fallback = TTS_MODELS["flash"]["id"]
+                # 選択したモデルが使えない場合は 3.1 Flash へフォールバック
+                fallback = TTS_MODELS["flash-3.1"]["id"]
                 if model_id != fallback and ("404" in str(e) or "not found" in str(e).lower()):
                     print(f"{model_id} が利用できないため {fallback} にフォールバック")
                     model_id = fallback
-                    response = self._call_tts(model_id, prompt, speech_config)
+                    wav = synthesize(model_id)
                 else:
                     raise
 
-            pcm = None
-            if response and getattr(response, "candidates", None):
-                cand = response.candidates[0]
-                parts = getattr(getattr(cand, "content", None), "parts", None) or []
-                for part in parts:
-                    inline = getattr(part, "inline_data", None)
-                    if inline is not None and getattr(inline, "data", None):
-                        pcm = inline.data
-                        break
-                    if getattr(part, "text", None):
-                        print(f"TTS: 音声ではなくテキストが返却されました: {part.text[:200]}")
-            if not pcm:
+            if not wav:
                 return {"success": False, "error": "音声データの生成に失敗しました - 応答に音声が含まれていません"}
 
-            wav_b64 = base64.b64encode(wave_file(pcm)).decode("utf-8")
+            wav_b64 = base64.b64encode(wav).decode("utf-8")
             return {"success": True, "audio_data": wav_b64, "format": "wav", "model": model_id}
         except Exception as e:
             print(f"Speech generation error: {e}")

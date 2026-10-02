@@ -7,7 +7,7 @@ Google Gemini API を使ったマルチメディア生成ツール集です。Fl
 | `/` | ランチャー・最近の生成物 | — |
 | `/image/` | 画像生成・会話しながら編集、アスペクト比・解像度（〜4K）、Google検索グラウンディング | `gemini-3.1-flash-lite-image` / `gemini-3.1-flash-image` / `gemini-3-pro-image` |
 | `/video/` | テキスト→動画、最初/最後フレーム指定、参照画像（3枚）、動画の延長、音声生成 | `veo-3.1-*-generate-preview` |
-| `/tts/` | 30音声・感情タグ・2話者会話・文書からの読み上げ・要約 | `gemini-3.1-flash-tts-preview` / `gemini-2.5-*-preview-tts` |
+| `/tts/` | 30音声・感情タグ・2話者会話・文書からの読み上げ・要約 | `gemini-3.8-flash-lite-tts` / `gemini-3.8-flash-tts` / `gemini-3.1-flash-tts-preview` |
 | `/music/` | 楽曲生成（30秒クリップ／フル尺、歌詞付き可）、プロンプトビルダー | `lyria-3-clip-preview` / `lyria-3-pro-preview` |
 | `/gallery/` | 生成履歴（**ブラウザ内 IndexedDB に保存**。サーバーには保存しません） | — |
 

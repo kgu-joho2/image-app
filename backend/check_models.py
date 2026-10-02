@@ -16,7 +16,7 @@ TARGETS = {
     "テキスト(整形用)": [TEXT_MODEL],
     "画像生成": ["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"],
     "動画生成": ["veo-3.1-fast-generate-preview", "veo-3.1-generate-preview", "veo-3.1-lite-generate-preview"],
-    "音声生成": ["gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
+    "音声生成": ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview"],
     "音楽生成": ["lyria-3-clip-preview", "lyria-3-pro-preview"],
 }
 

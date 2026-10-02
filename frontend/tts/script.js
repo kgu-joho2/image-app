@@ -1247,7 +1247,7 @@ class TTSApp {
   }
 
   getModelKey() {
-    return document.getElementById("tts-model")?.value || "flash-3.1";
+    return document.getElementById("tts-model")?.value || "flash-lite-3.8";
   }
 
   getSpeakerNames() {
