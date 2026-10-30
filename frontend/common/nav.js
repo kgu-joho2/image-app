@@ -3,6 +3,7 @@
   const LINKS = [
     { href: "/", label: "ホーム", key: "home" },
     { href: "/image/", label: "🖼️ 画像", key: "image" },
+    { href: "/gpt-image/", label: "🎨 GPT画像", key: "gpt-image" },
     { href: "/video/", label: "🎬 動画", key: "video" },
     { href: "/tts/", label: "🗣️ 音声", key: "tts" },
     { href: "/music/", label: "🎵 音楽", key: "music" },

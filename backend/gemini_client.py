@@ -56,6 +56,31 @@ def generate_text(contents) -> str:
     raise last_err or RuntimeError("no text model available")
 
 
+def generate_json(models, system_instruction: str, contents, schema: dict):
+    """
+    構造化出力（JSON Schema）で dict を得る。models を先頭から試し、404 の場合のみ次へ。
+    戻り値: (dict, 使用モデル)
+    """
+    config = genai_types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        response_mime_type="application/json",
+        response_json_schema=schema,
+    )
+    last_err = None
+    for model in dict.fromkeys(models):
+        try:
+            resp = client.models.generate_content(model=model, contents=contents, config=config)
+            return json.loads(resp.text), model
+        except Exception as e:
+            last_err = e
+            s = str(e)
+            if "404" in s or "not found" in s.lower() or "no longer available" in s.lower():
+                print(f"generate_json: {model} unavailable, trying next ({s[:80]})")
+                continue
+            raise
+    raise last_err or RuntimeError("no text model available")
+
+
 def enhance_prompt(instruction: str, user_text: str, fallback: Optional[str] = None) -> str:
     """
     instruction に従って user_text を整形した文字列を返す。
@@ -193,6 +218,11 @@ def api_error_response(e: Exception, label: str):
     traceback.print_exc()
     s = str(e)
     low = s.lower()
+    if "no credits" in low or "insufficient_quota" in low or "billing_hard_limit" in low:
+        return jsonify({
+            "error": "OpenAI API のクレジット残高がありません。管理者に platform.openai.com の Billing でのチャージを依頼してください。",
+            "error_type": "quota_exceeded",
+        }), 429
     if "429" in s and ("resource_exhausted" in low or "quota" in low):
         return jsonify({
             "error": f"{label}の1日あたりの利用上限に達しました。明日再度お試しください。",
@@ -236,7 +266,7 @@ def decode_image_input(img: dict):
 
 
 __all__ = [
-    "client", "genai_types", "API_KEY", "TEXT_MODEL", "generate_text",
+    "client", "genai_types", "API_KEY", "TEXT_MODEL", "generate_text", "generate_json",
     "enhance_prompt", "interactions_create", "to_data_url",
     "api_error_response", "decode_image_input",
 ]

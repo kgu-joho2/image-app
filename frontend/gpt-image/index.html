@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GPT画像 - Gemini Studio</title>
+    <link rel="stylesheet" href="/common/base.css" />
+    <link rel="stylesheet" href="/image/style.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="/common/nav.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <div class="page-head">
+        <h1>🎨 GPT画像 / スライド再作成</h1>
+        <p>OpenAI GPT Image 2.5 で画像を生成・編集。PPTX を添付すると、AI が各スライドの見せ方を考えて作り直し、新しい PPTX にまとめます。</p>
+      </div>
+
+      <div class="card notice" id="not-configured" hidden>
+        ⚠️ OPENAI_API_KEY が設定されていないため生成できません。<code>backend/.env</code> に追加してコンテナを再起動してください。
+      </div>
+
+      <div class="segmented tabs" id="tabs">
+        <label><input type="radio" name="tab" value="gen" checked />🖼️ 画像生成</label>
+        <label><input type="radio" name="tab" value="pptx" />📑 PPTXスライド再作成</label>
+      </div>
+
+      <div class="layout">
+        <aside class="stack">
+          <section class="card">
+            <h3>⚙️ 生成設定</h3>
+            <div class="stack">
+              <div class="field">
+                <label>モデル</label>
+                <div class="segmented">
+                  <label><input type="radio" name="model" value="flare" checked />Flare</label>
+                  <label><input type="radio" name="model" value="sunburst" />Sunburst</label>
+                </div>
+                <div class="hint" id="model-hint"></div>
+              </div>
+              <div class="field">
+                <label>品質</label>
+                <div class="chips" id="quality-chips"></div>
+              </div>
+              <div class="field only-gen">
+                <label>アスペクト比</label>
+                <div class="chips" id="aspect-chips"></div>
+              </div>
+              <div class="field">
+                <label>解像度（長辺）</label>
+                <div class="chips" id="edge-chips"></div>
+                <div class="hint" id="edge-hint"></div>
+              </div>
+              <div class="field">
+                <label>出力形式</label>
+                <div class="chips" id="format-chips"></div>
+              </div>
+              <div class="field only-gen">
+                <label>背景</label>
+                <div class="chips" id="bg-chips"></div>
+              </div>
+              <div class="field only-gen">
+                <label>枚数</label>
+                <div class="chips" id="n-chips"></div>
+              </div>
+              <label class="check only-gen"><input type="checkbox" id="opt-enhance" /><span>日本語プロンプトを英語に整形（Gemini）</span></label>
+            </div>
+          </section>
+        </aside>
+
+        <!-- ===== タブ1: 画像生成 ===== -->
+        <section class="stack" id="pane-gen">
+          <div class="card">
+            <div id="thread" class="thread">
+              <div class="turn assistant">
+                <div class="bubble">生成したい画像のイメージを入力してください。画像を添付すると、その画像をもとに編集・合成します（最大16枚）。</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card composer">
+            <div class="thumbs" id="input-thumbs"></div>
+            <textarea id="prompt" rows="3" placeholder="例: 神戸の港の夜景をミニチュア風に。手前に「KOBE」のネオン看板"></textarea>
+            <div class="row">
+              <label class="upload-btn" for="image-upload">📎 画像を添付</label>
+              <input type="file" id="image-upload" accept="image/*" multiple style="display: none" />
+              <span class="hint" id="upload-hint"></span>
+              <span class="spacer"></span>
+              <button class="btn btn-primary" id="send">
+                <span class="btn-text">生成する</span>
+                <span class="btn-loading"><span class="spinner"></span>生成中...</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== タブ2: PPTX スライド再作成 ===== -->
+        <section class="stack" id="pane-pptx" hidden>
+          <div class="card">
+            <h3>📑 スライド資料</h3>
+            <label class="dropzone" id="pptx-drop" for="pptx-upload">
+              <div style="font-size: 28px">📥</div>
+              <div id="pptx-drop-text">PPTX ファイルをここにドロップ、またはクリックして選択</div>
+            </label>
+            <input type="file" id="pptx-upload" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" style="display: none" />
+            <div class="progress indeterminate" id="parse-progress" hidden style="margin-top: 10px"><i></i></div>
+          </div>
+
+          <div class="card" id="deck-settings" hidden>
+            <h3>🎨 再作成の指示</h3>
+            <div class="stack">
+              <div class="field">
+                <label>デザインの方向性</label>
+                <div class="chips" id="style-chips"></div>
+                <textarea id="style" rows="2" placeholder="例: 白基調で紺とオレンジのアクセント、フラットなアイコン、大学の講義資料らしい落ち着いた雰囲気"></textarea>
+              </div>
+              <div class="field">
+                <label>見せ方</label>
+                <div class="segmented">
+                  <label><input type="radio" name="layout" value="redesign" checked />自由に演出（おすすめ）</label>
+                  <label><input type="radio" name="layout" value="keep" />元の構成に近く</label>
+                </div>
+                <div class="hint">文言はそのまま残し、人物・図解・グラフなどで伝わる見せ方を AI が考えます。</div>
+              </div>
+              <label class="check"><input type="checkbox" id="opt-consistent" checked /><span>最初に完成したスライドを見本にして、色・書体・イラストのタッチを揃える</span></label>
+              <div class="field">
+                <label>参考画像（任意: ロゴ・テンプレート・好みのスライドなど）</label>
+                <div class="row">
+                  <div class="thumbs" id="ref-thumbs"></div>
+                  <label class="upload-btn" for="ref-upload">📎 追加</label>
+                  <input type="file" id="ref-upload" accept="image/*" multiple style="display: none" />
+                </div>
+              </div>
+              <div class="field">
+                <label>演出プランを考える AI</label>
+                <div class="segmented" id="planner">
+                  <label><input type="radio" name="planner" value="gemini-lite" checked />Gemini Flash-Lite</label>
+                  <label><input type="radio" name="planner" value="gemini" />Gemini Flash</label>
+                  <label><input type="radio" name="planner" value="gpt" />GPT</label>
+                </div>
+                <div class="hint">Gemini は安価で OpenAI のクレジットを使いません（Flash-Lite は約10秒、Flash は丁寧ですが約1分）。元スライドの画像も読み取って提案します。</div>
+              </div>
+              <div class="row">
+                <button class="btn btn-secondary" id="plan">
+                  <span class="btn-text">① 演出プランを作成</span>
+                  <span class="btn-loading"><span class="spinner dark"></span>AI が見せ方を検討中...</span>
+                </button>
+                <span class="hint" id="plan-hint">デッキ全体のデザインと各スライドの見せ方を AI が提案します。生成前に編集できます。</span>
+              </div>
+              <div class="field" id="design-field" hidden>
+                <label>デッキ共通のデザイン（全スライドに適用・編集可）</label>
+                <textarea id="design-system" rows="4"></textarea>
+              </div>
+              <div class="hint warn-text" id="cost-hint"></div>
+              <div class="row">
+                <button class="btn btn-primary" id="run">
+                  <span class="btn-text">② 選択したスライドを生成</span>
+                  <span class="btn-loading"><span class="spinner"></span>生成中...</span>
+                </button>
+                <button class="btn btn-secondary" id="stop" hidden>⏹ 中断</button>
+                <span class="spacer"></span>
+                <button class="btn btn-ghost btn-sm" id="select-all">すべて選択</button>
+                <button class="btn btn-ghost btn-sm" id="select-none">選択解除</button>
+              </div>
+              <div id="run-status" hidden>
+                <div class="progress"><i id="run-bar"></i></div>
+                <div class="hint" id="run-text"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" id="deck-card" hidden>
+            <div class="row" style="margin-bottom: 10px">
+              <h3 style="margin: 0" id="deck-title">スライド</h3>
+              <span class="spacer"></span>
+              <button class="btn btn-secondary btn-sm" id="dl-images">⬇️ 画像を一括DL</button>
+              <button class="btn btn-primary btn-sm" id="dl-pptx">
+                <span class="btn-text">📦 PPTXをダウンロード</span>
+                <span class="btn-loading"><span class="spinner"></span>作成中...</span>
+              </button>
+            </div>
+            <p class="hint">未作成・選択外のスライドは元のスライド画像のまま PPTX に入ります。ノートは引き継がれます。</p>
+            <div id="slides" class="slide-list"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="/common/ui.js"></script>
+    <script src="/common/history.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

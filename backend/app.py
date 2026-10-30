@@ -6,6 +6,7 @@ Gemini マルチメディア生成アプリ — Flask エントリポイント
   /video/      動画生成
   /tts/        音声生成
   /music/      音楽生成
+  /gpt-image/  画像生成（GPT Image 2.5）+ PPTX スライド再作成
   /gallery/    生成履歴（ブラウザ内保存）
   /common/     共通アセット
 """
@@ -22,12 +23,13 @@ app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024  # 4K画像・複数参照画像に備えて 64MB
 
 # --- API Blueprints ---
-from routes import image_bp, video_bp, tts_bp, music_bp  # noqa: E402
+from routes import image_bp, video_bp, tts_bp, music_bp, gpt_image_bp  # noqa: E402
 
 app.register_blueprint(image_bp)
 app.register_blueprint(video_bp)
 app.register_blueprint(tts_bp)
 app.register_blueprint(music_bp)
+app.register_blueprint(gpt_image_bp)
 
 
 # --- 静的ページ ---
@@ -49,7 +51,7 @@ def _page(name):
     app.add_url_rule(f"/{name}/<path:filename>", f"{name}_static", page_static)
 
 
-for _name in ("image", "video", "tts", "music", "gallery", "common"):
+for _name in ("image", "video", "tts", "music", "gpt-image", "gallery", "common"):
     _page(_name)
 
 

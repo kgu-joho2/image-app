@@ -1,0 +1,50 @@
+[hidden] { display: none !important; }
+.tabs { margin-bottom: 16px; }
+.dropzone { display: block; }
+.notice { background: var(--warn-soft); border-color: transparent; color: var(--warn); margin-bottom: 16px; }
+.warn-text { color: var(--warn); }
+.gen-image .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+
+/* スライド一覧 */
+.slide-list { display: flex; flex-direction: column; gap: 12px; }
+.slide-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.slide-row.off { opacity: 0.6; }
+.slide-row .num { display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 700; color: var(--text-muted); }
+.slide-row .num input { accent-color: var(--primary); width: 16px; height: 16px; }
+.slide-row figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.slide-row figcaption { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+.slide-row .frame {
+  aspect-ratio: var(--slide-ar, 16 / 9);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 0;
+}
+.slide-row .frame img { width: 100%; height: 100%; object-fit: contain; cursor: zoom-in; display: block; }
+.slide-row .frame.skeleton { border-color: transparent; }
+.slide-row .frame.error { background: var(--danger-soft); color: var(--danger); padding: 8px; }
+.slide-row .detail { grid-column: 2 / -1; display: flex; flex-direction: column; gap: 8px; }
+.slide-row .detail input[type="text"] { padding: 6px 10px; font-size: 0.9rem; }
+.slide-row .result-actions { margin-top: 0; }
+@media (max-width: 700px) {
+  .slide-row { grid-template-columns: 28px minmax(0, 1fr); }
+  .slide-row figure.after { grid-column: 2; }
+}
+.slide-row .detail textarea[data-concept] { min-height: 64px; font-size: 0.88rem; }
+.slide-row .detail .check { font-size: 0.85rem; }

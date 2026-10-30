@@ -46,13 +46,16 @@ window.UI = (function () {
   class ApiError extends Error {
     constructor(message, { status, type } = {}) { super(message); this.status = status; this.type = type; }
   }
-  async function api(url, { method = "POST", body, signal } = {}) {
+  // body が FormData ならそのまま送る。raw: true なら成功時に Blob を返す（ファイル応答用）
+  async function api(url, { method = "POST", body, signal, raw = false } = {}) {
+    const isForm = body instanceof FormData;
     const res = await fetch(url, {
       method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
+      headers: body && !isForm ? { "Content-Type": "application/json" } : undefined,
+      body: body ? (isForm ? body : JSON.stringify(body)) : undefined,
       signal,
     });
+    if (raw && res.ok) return res.blob();
     let data = {};
     try { data = await res.json(); } catch {}
     if (!res.ok) {
