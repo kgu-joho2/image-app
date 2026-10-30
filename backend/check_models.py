@@ -15,7 +15,7 @@ from gemini_client import client, TEXT_MODEL
 TARGETS = {
     "テキスト(整形用)": [TEXT_MODEL],
     "画像生成": ["gemini-3.1-flash-lite-image", "gemini-3.1-flash-image", "gemini-3-pro-image", "gemini-2.5-flash-image"],
-    "動画生成": ["veo-3.1-fast-generate-preview", "veo-3.1-generate-preview", "veo-3.1-lite-generate-preview"],
+    "動画生成": ["gemini-omni-1.1-flash"],
     "音声生成": ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts", "gemini-3.1-flash-tts-preview"],
     "音楽生成": ["lyria-3-clip-preview", "lyria-3-pro-preview"],
 }
@@ -50,9 +50,11 @@ def live_check(model: str) -> str:
         if "lyria" in model:
             r = client.interactions.create(model=model, input="A short calm piano loop.")
             return "OK" if getattr(r, "output_audio", None) else "応答に音声なし"
-        if "veo" in model:
-            op = client.models.generate_videos(model=model, prompt="A leaf falling.")
-            return f"OK (operation started: {getattr(op, 'name', '')})"
+        if "omni" in model:
+            # 最も安い設定（360p・3秒）で1本生成する
+            r = client.interactions.create(model=model, input="A leaf falling.", store=False,
+                                           response_format={"type": "video", "resolution": "360p", "duration": "3s"})
+            return "OK" if getattr(r, "output_video", None) else "応答に動画なし"
         r = client.models.generate_content(model=model, contents="ping")
         return "OK"
     except Exception as e:

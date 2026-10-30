@@ -1,38 +1,47 @@
 """
-動画生成 (Veo 3.1) — ジョブID方式
-https://ai.google.dev/gemini-api/docs/veo
+動画生成 (Gemini Omni Flash / Interactions API) — ジョブID方式
+https://ai.google.dev/gemini-api/docs/omni
+
+Veo 3.1 Preview は 2026-10-22 に提供終了したため、後継の gemini-omni-1.1-flash を使う。
+Interactions API の呼び出しは完了まで戻らないので、バックグラウンドスレッドで実行し、
+フロントからはこれまで通りジョブIDでポーリングする。
 
 POST /api/video/jobs        … 生成開始（即時に job_id を返す）
 GET  /api/video/jobs/<id>   … 進捗確認。完了時に動画(data URL)を返す
 """
-import uuid
+import re
 import time
+import uuid
 import base64
 import threading
 
 from flask import Blueprint, request, jsonify
 
-from gemini_client import (
-    client, genai_types, enhance_prompt, api_error_response, decode_image_input,
-)
+from gemini_client import client, enhance_prompt, error_payload, api_error_response
 
 bp = Blueprint("video", __name__)
 
-VIDEO_MODELS = {
-    "fast":     "veo-3.1-fast-generate-preview",
-    "standard": "veo-3.1-generate-preview",
-    "lite":     "veo-3.1-lite-generate-preview",
-}
-DURATIONS = (4, 6, 8)
-RESOLUTIONS = ("720p", "1080p", "4k")
+VIDEO_MODEL = "gemini-omni-1.1-flash"
+DURATIONS = (3, 4, 6, 8, 10)          # API の許容範囲は 3〜10 秒
+DEFAULT_DURATION = 4
+RESOLUTIONS = ("360p", "720p", "1080p", "4k")
 ASPECTS = ("16:9", "9:16")
 MAX_REFERENCE_IMAGES = 3
 
-# job_id -> {"operation": ..., "status": str, "created": float, "video": types.Video|None,
-#            "result": dict|None, "error": str|None, "model": str}
+# 料金（USD / 100万トークン）https://ai.google.dev/gemini-api/docs/pricing
+# 720p は 1 秒あたり 5,792 出力トークン ≒ $0.10/秒（公式）
+# 360p は 1 秒あたり 1,931 出力トークン ≒ $0.034/秒（2026-10-30 実測）
+# 延長は「元動画＋続き」が1本で返り、課金は追加分の秒数のみ（実測）
+PRICE_OUTPUT_PER_M = 17.50
+PRICE_INPUT_PER_M = 1.50
+
+# job_id -> {"status": str, "created": float, "result": dict|None, "error": str|None,
+#            "model": str, "prompt_used": str, "interaction_id": str|None, "options": dict}
 _jobs: dict = {}
 _lock = threading.Lock()
-JOB_TTL_SEC = 60 * 60 * 6  # 6時間で忘れる（サーバー側の動画自体は2日保持）
+JOB_TTL_SEC = 60 * 60 * 6  # 6時間で忘れる
+FILE_READY_TIMEOUT_SEC = 120
+CREATE_TIMEOUT_SEC = 900
 
 
 def _gc_jobs():
@@ -42,10 +51,10 @@ def _gc_jobs():
             _jobs.pop(k, None)
 
 
-def _build_instruction(has_image: bool, has_last: bool, is_extension: bool, has_refs: bool) -> str:
+def _build_instruction(has_image: bool, has_last: bool, is_extension: bool, has_refs: bool, has_negative: bool) -> str:
     base = (
         "You are a professional video prompt engineer. Rewrite the user's request (usually Japanese) into a detailed, "
-        "production-ready English prompt for Veo video generation. Be explicit about subject(s), actions over time, "
+        "production-ready English prompt for Gemini Omni video generation. Be explicit about subject(s), actions over time, "
         "camera movement (dolly-in, pan, drone shot...), framing, lighting, color mood, visual style, ambience and sound. "
         "Keep it concise but specific. Output ONLY the final prompt."
     )
@@ -57,25 +66,109 @@ def _build_instruction(has_image: bool, has_last: bool, is_extension: bool, has_
         base += " IMPORTANT: Use the attached image as the FIRST FRAME and preserve subject identity, colors and layout."
     if has_refs:
         base += " The attached reference images define the appearance of the subject(s); keep them consistent."
+    if has_negative:
+        base += " The request lists elements to avoid; end the prompt with one sentence starting with 'Do not show'."
     return base
 
 
-def _to_image(img: dict):
-    dec = decode_image_input(img)
-    if not dec:
+def _image_part(img: dict):
+    if not isinstance(img, dict) or not img.get("data") or not img.get("mime_type"):
         return None
-    mime, raw = dec
-    return genai_types.Image(image_bytes=raw, mime_type=mime)
+    return {"type": "image", "data": img["data"], "mime_type": img["mime_type"].lower()}
+
+
+def _estimate_cost(usage) -> dict:
+    if usage is None:
+        return {}
+    u = usage.model_dump() if hasattr(usage, "model_dump") else dict(usage)
+    out_tok = u.get("total_output_tokens") or 0
+    in_tok = u.get("total_input_tokens") or 0
+    usd = out_tok * PRICE_OUTPUT_PER_M / 1e6 + in_tok * PRICE_INPUT_PER_M / 1e6
+    return {"input_tokens": in_tok, "output_tokens": out_tok, "cost_usd": round(usd, 4)}
+
+
+def _file_name_from_uri(uri: str):
+    m = re.search(r"(files/[\w\-]+)", uri or "")
+    return m.group(1) if m else None
+
+
+def _extract_video(interaction):
+    """Interaction から (bytes, mime) を取り出す。URI 配信の場合はファイルの準備完了を待ってダウンロード。"""
+    video = getattr(interaction, "output_video", None)
+    if video is None:
+        # 念のため steps を走査
+        for step in getattr(interaction, "steps", None) or []:
+            for c in getattr(step, "content", None) or []:
+                if getattr(c, "type", None) == "video":
+                    video = c
+    if video is None:
+        return None, None
+    mime = getattr(video, "mime_type", None) or "video/mp4"
+    data = getattr(video, "data", None)
+    if data:
+        return (bytes(data) if isinstance(data, (bytes, bytearray)) else base64.b64decode(data)), mime
+
+    uri = getattr(video, "uri", None)
+    if not uri:
+        return None, mime
+    name = _file_name_from_uri(uri)
+    if name:
+        deadline = time.time() + FILE_READY_TIMEOUT_SEC
+        while True:
+            f = client.files.get(name=name)
+            state = str(getattr(f, "state", "") or "")
+            if "ACTIVE" in state:
+                break
+            if "FAILED" in state:
+                raise RuntimeError(f"生成動画ファイルの処理に失敗しました ({state})")
+            if time.time() > deadline:
+                raise RuntimeError("生成動画ファイルの準備がタイムアウトしました")
+            time.sleep(2)
+    return client.files.download(file=name or uri), mime
+
+
+def _run_job(job_id: str, kwargs: dict):
+    started = time.time()
+    try:
+        # SDK 既定はタイムアウト無し・リトライ無し（再送による二重課金は起きない）
+        interaction = client.interactions.create(**kwargs, timeout=CREATE_TIMEOUT_SEC)
+        video_bytes, mime = _extract_video(interaction)
+        if not video_bytes:
+            text = (getattr(interaction, "output_text", None) or "").strip()
+            raise RuntimeError(f"動画が生成されませんでした。{text[:200]}".strip())
+        b64 = base64.b64encode(video_bytes).decode("utf-8")
+        usage = _estimate_cost(getattr(interaction, "usage", None))
+        with _lock:
+            job = _jobs[job_id]
+            job["interaction_id"] = getattr(interaction, "id", None)
+            job["result"] = {
+                "results": [{"type": "video", "content": f"data:{mime};base64,{b64}", "mime_type": mime}],
+                "model": job["model"],
+                "prompt_used": job["prompt_used"],
+                "options": job["options"],
+                "usage": usage,
+                "elapsed": int(time.time() - job["created"]),
+            }
+            job["status"] = "done"
+        print(f"Video job {job_id[:8]} done in {time.time() - started:.0f}s, {len(video_bytes)//1024}KB, usage={usage}")
+    except Exception as e:
+        payload, _ = error_payload(e, "動画生成")
+        with _lock:
+            if job_id in _jobs:
+                _jobs[job_id]["status"] = "error"
+                _jobs[job_id]["error"] = payload.get("error")
 
 
 @bp.route("/api/video/models")
 def video_models():
     return jsonify({
-        "models": [{"key": k, "id": v} for k, v in VIDEO_MODELS.items()],
+        "models": [{"key": "omni", "id": VIDEO_MODEL}],
         "durations": DURATIONS,
+        "default_duration": DEFAULT_DURATION,
         "resolutions": RESOLUTIONS,
         "aspect_ratios": ASPECTS,
         "max_reference_images": MAX_REFERENCE_IMAGES,
+        "price_usd_per_sec_720p": round(5792 * PRICE_OUTPUT_PER_M / 1e6, 3),
     })
 
 
@@ -86,90 +179,88 @@ def create_job():
         data = request.get_json() or {}
         prompt = (data.get("prompt") or "").strip()
         options = data.get("options") or {}
-        first_image = data.get("first_frame")          # {mime_type, data}
-        last_image = data.get("last_frame")            # {mime_type, data}
-        reference_images = data.get("reference_images") or []  # [{mime_type, data}]
-        extend_job_id = data.get("extend_job_id")      # 延長元ジョブ
+        first_image = _image_part(data.get("first_frame"))
+        last_image = _image_part(data.get("last_frame"))
+        reference_images = [p for p in (_image_part(r) for r in (data.get("reference_images") or [])) if p]
+        extend_job_id = data.get("extend_job_id")
 
         if not prompt:
             return jsonify({"error": "プロンプトを入力してください。"}), 400
         if len(reference_images) > MAX_REFERENCE_IMAGES:
             return jsonify({"error": f"参照画像は最大{MAX_REFERENCE_IMAGES}枚までです。"}), 400
 
-        model = VIDEO_MODELS.get(options.get("model", "fast"), VIDEO_MODELS["fast"])
-
-        source_video = None
+        source = None
         if extend_job_id:
             with _lock:
                 src = _jobs.get(extend_job_id)
-            if not src or not src.get("video"):
+            if not src or not src.get("interaction_id"):
                 return jsonify({"error": "延長元の動画が見つかりません（有効期限切れの可能性があります）。"}), 400
-            source_video = src["video"]
+            source = src
 
+        try:
+            duration = int(options.get("duration_seconds") or DEFAULT_DURATION)
+        except Exception:
+            duration = DEFAULT_DURATION
+        if duration not in DURATIONS:
+            duration = DEFAULT_DURATION
+        resolution = options.get("resolution") if options.get("resolution") in RESOLUTIONS else "720p"
+        aspect = options.get("aspect_ratio") if options.get("aspect_ratio") in ASPECTS else "16:9"
+        negative = (options.get("negative_prompt") or "").strip()
+
+        # Omni にはネガティブプロンプト欄が無いので、プロンプト内に「Do not show …」として含める
         processed = prompt
         if options.get("enhance_prompt", True):
+            user_text = prompt + (f"\n\n避けたい要素: {negative}" if negative else "")
             processed = enhance_prompt(
-                _build_instruction(bool(first_image), bool(last_image), bool(source_video), bool(reference_images)),
-                prompt,
+                _build_instruction(bool(first_image), bool(last_image), bool(source),
+                                   bool(reference_images), bool(negative)),
+                user_text,
             )
+        elif negative:
+            processed = f"{prompt}\n\nDo not show: {negative}."
 
-        cfg = {}
-        try:
-            d = int(options.get("duration_seconds") or 8)
-            if d in DURATIONS:
-                cfg["duration_seconds"] = d
-        except Exception:
-            pass
-        if options.get("resolution") in RESOLUTIONS:
-            cfg["resolution"] = options["resolution"]
-        if options.get("aspect_ratio") in ASPECTS:
-            cfg["aspect_ratio"] = options["aspect_ratio"]
-        neg = (options.get("negative_prompt") or "").strip()
-        if neg:
-            cfg["negative_prompt"] = neg
-        # generate_audio は Gemini Developer API では指定不可（常に音声付きで生成される）
-        if options.get("person_generation") in ("allow_all", "allow_adult", "dont_allow"):
-            cfg["person_generation"] = options["person_generation"]
+        response_format = {"type": "video", "duration": f"{duration}s", "resolution": resolution, "delivery": "uri"}
+        kwargs = {"model": VIDEO_MODEL}
+        task = None
 
-        kwargs = {"model": model, "prompt": processed}
-
-        if source_video is not None:
-            kwargs["video"] = source_video
-            # 延長は 720p のみ対応
-            cfg["resolution"] = "720p"
-            cfg.pop("aspect_ratio", None)
+        if source is not None:
+            # 延長: 直前の生成結果を previous_interaction_id で引き継ぐ（縦横比・解像度は元動画に合わせる）
+            kwargs["previous_interaction_id"] = source["interaction_id"]
+            resolution = source["options"]["resolution"]
+            aspect = source["options"]["aspect_ratio"]
+            response_format["resolution"] = resolution
+            # previous_interaction_id と video_config.task は併用できない（400）ため、指示文で延長を明示する
+            kwargs["input"] = f"Extend this video. {processed}"
         else:
+            response_format["aspect_ratio"] = aspect
+            parts = []
             if first_image:
-                img = _to_image(first_image)
-                if img:
-                    kwargs["image"] = img
-            if last_image and "image" in kwargs:
-                last = _to_image(last_image)
-                if last:
-                    cfg["last_frame"] = last
-            refs = []
-            for r in reference_images:
-                img = _to_image(r)
-                if img:
-                    refs.append(genai_types.VideoGenerationReferenceImage(image=img, reference_type="asset"))
-            if refs:
-                cfg["reference_images"] = refs
+                parts.append(first_image)
+                if last_image:
+                    parts.append(last_image)
+                else:
+                    task = "image_to_video"
+            elif reference_images:
+                parts.extend(reference_images)
+                task = "reference_to_video"
+            kwargs["input"] = parts + [{"type": "text", "text": processed}] if parts else processed
 
-        if cfg:
-            kwargs["config"] = genai_types.GenerateVideosConfig(**cfg)
+        kwargs["response_format"] = response_format
+        if task:
+            kwargs["generation_config"] = {"video_config": {"task": task}}
 
-        print(f"Video job: model={model}, cfg={ {k: v for k, v in cfg.items() if k not in ('last_frame','reference_images')} }, "
-              f"image={'image' in kwargs}, last={'last_frame' in cfg}, refs={len(cfg.get('reference_images', []))}, extend={source_video is not None}")
-        operation = client.models.generate_videos(**kwargs)
+        job_options = {"duration_seconds": duration, "resolution": resolution, "aspect_ratio": aspect}
+        print(f"Video job: model={VIDEO_MODEL}, task={task or 'auto'}, {job_options}, "
+              f"first={bool(first_image)}, last={bool(last_image)}, refs={len(reference_images)}, extend={source is not None}")
 
         job_id = uuid.uuid4().hex
         with _lock:
             _jobs[job_id] = {
-                "operation": operation, "status": "running", "created": time.time(),
-                "video": None, "result": None, "error": None, "model": model,
-                "prompt_used": processed,
+                "status": "running", "created": time.time(), "result": None, "error": None,
+                "model": VIDEO_MODEL, "prompt_used": processed, "interaction_id": None, "options": job_options,
             }
-        return jsonify({"job_id": job_id, "status": "running", "prompt_used": processed, "model": model}), 202
+        threading.Thread(target=_run_job, args=(job_id, kwargs), daemon=True).start()
+        return jsonify({"job_id": job_id, "status": "running", "prompt_used": processed, "model": VIDEO_MODEL}), 202
     except Exception as e:
         return api_error_response(e, "動画生成")
 
@@ -178,50 +269,11 @@ def create_job():
 def get_job(job_id):
     with _lock:
         job = _jobs.get(job_id)
-    if not job:
-        return jsonify({"error": "ジョブが見つかりません。"}), 404
-    if job["status"] == "done":
-        return jsonify({"job_id": job_id, "status": "done", **job["result"]})
-    if job["status"] == "error":
-        return jsonify({"job_id": job_id, "status": "error", "error": job["error"]}), 500
-
-    try:
-        operation = client.operations.get(job["operation"])
-        job["operation"] = operation
-        if not getattr(operation, "done", False):
-            elapsed = int(time.time() - job["created"])
-            return jsonify({"job_id": job_id, "status": "running", "elapsed": elapsed})
-
-        err = getattr(operation, "error", None)
-        if err:
-            raise RuntimeError(str(err))
-        resp = getattr(operation, "response", None)
-        videos = getattr(resp, "generated_videos", None) or []
-        if not videos:
-            # 安全性フィルタ等で0本になる場合
-            reason = getattr(resp, "rai_media_filtered_reasons", None)
-            raise RuntimeError(f"動画が生成されませんでした。{reason or ''}".strip())
-
-        gv = videos[0]
-        downloaded = client.files.download(file=gv.video)
-        video_bytes = downloaded if isinstance(downloaded, (bytes, bytearray)) else None
-        if not video_bytes:
-            video_bytes = getattr(gv.video, "video_bytes", None)
-        if not video_bytes:
-            raise RuntimeError("動画データの取得に失敗しました")
-        mime = getattr(gv.video, "mime_type", None) or "video/mp4"
-        b64 = base64.b64encode(video_bytes).decode("utf-8")
-        job["video"] = gv.video
-        job["status"] = "done"
-        job["result"] = {
-            "results": [{"type": "video", "content": f"data:{mime};base64,{b64}", "mime_type": mime}],
-            "model": job["model"],
-            "prompt_used": job["prompt_used"],
-            "elapsed": int(time.time() - job["created"]),
-        }
-        return jsonify({"job_id": job_id, "status": "done", **job["result"]})
-    except Exception as e:
-        job["status"] = "error"
-        resp, code = api_error_response(e, "動画生成")
-        job["error"] = resp.get_json().get("error")
-        return resp, code
+        if not job:
+            return jsonify({"error": "ジョブが見つかりません。"}), 404
+        status, result, error, created = job["status"], job["result"], job["error"], job["created"]
+    if status == "done":
+        return jsonify({"job_id": job_id, "status": "done", **result})
+    if status == "error":
+        return jsonify({"job_id": job_id, "status": "error", "error": error}), 500
+    return jsonify({"job_id": job_id, "status": "running", "elapsed": int(time.time() - created)})

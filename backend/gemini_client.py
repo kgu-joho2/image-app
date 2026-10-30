@@ -7,6 +7,7 @@ Gemini API 共通クライアント・ユーティリティ
 """
 import os
 import json
+import re
 import base64
 import traceback
 import urllib.request
@@ -214,27 +215,43 @@ def api_error_response(e: Exception, label: str):
     """
     例外を利用者向けの JSON 応答へ変換する。label は「画像生成」など機能名。
     """
+    payload, code = error_payload(e, label)
+    return jsonify(payload), code
+
+
+def error_payload(e: Exception, label: str):
+    """
+    例外を利用者向けの (dict, HTTPステータス) へ変換する。
+    Flask のアプリコンテキスト外（バックグラウンドスレッド）からも使える。
+    """
     print(f"{label} error: {e}")
     traceback.print_exc()
     s = str(e)
     low = s.lower()
     if "no credits" in low or "insufficient_quota" in low or "billing_hard_limit" in low:
-        return jsonify({
+        return ({
             "error": "OpenAI API のクレジット残高がありません。管理者に platform.openai.com の Billing でのチャージを依頼してください。",
             "error_type": "quota_exceeded",
         }), 429
     if "429" in s and ("resource_exhausted" in low or "quota" in low):
-        return jsonify({
+        return ({
             "error": f"{label}の1日あたりの利用上限に達しました。明日再度お試しください。",
             "error_type": "quota_exceeded",
         }), 429
     if "quota" in low or "exceeded" in low or "429" in s:
-        return jsonify({
+        return ({
             "error": f"{label}の利用上限に達しました。しばらく時間をおいてから再度お試しください。",
             "error_type": "quota_exceeded",
         }), 429
+    if "no longer available" in low:
+        m = re.search(r"use (?:models/)?([\w.\-]+) for", s)
+        hint = f"（後継モデル: {m.group(1)}）" if m else ""
+        return ({
+            "error": f"{label}モデルは提供が終了しました{hint}。管理者にアプリの更新を依頼してください。",
+            "error_type": "model_retired",
+        }), 500
     if "404" in s or "not found" in low or "not_found" in low:
-        return jsonify({
+        return ({
             "error": f"{label}モデルが利用できません（このAPIキーで未対応、またはモデル名が変更された可能性があります）。backend/check_models.py で確認してください。",
             "error_type": "model_unavailable",
         }), 500
@@ -242,14 +259,14 @@ def api_error_response(e: Exception, label: str):
         reason = ""
         if "copyright" in low or "recitation" in low:
             reason = "（著作物・実在のロゴや旗などの再現とみなされた可能性があります）"
-        return jsonify({
+        return ({
             "error": f"リクエストがフィルタでブロックされました{reason}。プロンプトの内容を見直してください。",
             "error_type": "blocked",
             "detail": s[:300],
         }), 400
     if "400" in s or "invalid_argument" in low:
-        return jsonify({"error": f"リクエストが不正です: {s}", "error_type": "bad_request"}), 400
-    return jsonify({"error": f"{label}中にエラーが発生しました: {s}"}), 500
+        return ({"error": f"リクエストが不正です: {s}", "error_type": "bad_request"}), 400
+    return ({"error": f"{label}中にエラーが発生しました: {s}"}), 500
 
 
 def decode_image_input(img: dict):
@@ -268,5 +285,5 @@ def decode_image_input(img: dict):
 __all__ = [
     "client", "genai_types", "API_KEY", "TEXT_MODEL", "generate_text", "generate_json",
     "enhance_prompt", "interactions_create", "to_data_url",
-    "api_error_response", "decode_image_input",
+    "api_error_response", "error_payload", "decode_image_input",
 ]

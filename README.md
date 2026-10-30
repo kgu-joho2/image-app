@@ -7,7 +7,7 @@ Google Gemini API を使ったマルチメディア生成ツール集です。Fl
 | `/` | ランチャー・最近の生成物 | — |
 | `/image/` | 画像生成・会話しながら編集、アスペクト比・解像度（〜4K）、Google検索グラウンディング | `gemini-3.1-flash-lite-image` / `gemini-3.1-flash-image` / `gemini-3-pro-image` |
 | `/gpt-image/` | **OpenAI** 画像生成・画像編集（参照画像16枚まで）、PPTX の各スライドを作り直して新しい PPTX / 画像として出力 | `gpt-image-2.5-flare` / `gpt-image-2.5-sunburst` |
-| `/video/` | テキスト→動画、最初/最後フレーム指定、参照画像（3枚）、動画の延長、音声生成 | `veo-3.1-*-generate-preview` |
+| `/video/` | テキスト→動画、最初/最後フレーム指定、参照画像（3枚）、動画の延長、音声生成 | `gemini-omni-1.1-flash`（Interactions API。Veo 3.1 Preview は 2026-10-22 終了） |
 | `/tts/` | 30音声・感情タグ・2話者会話・文書からの読み上げ・要約 | `gemini-3.8-flash-lite-tts` / `gemini-3.8-flash-tts` / `gemini-3.1-flash-tts-preview` |
 | `/music/` | 楽曲生成（30秒クリップ／フル尺、歌詞付き可）、プロンプトビルダー | `lyria-3-clip-preview` / `lyria-3-pro-preview` |
 | `/gallery/` | 生成履歴（**ブラウザ内 IndexedDB に保存**。サーバーには保存しません） | — |
@@ -52,7 +52,7 @@ frontend/
 
 - 画像・音楽・（必要なら）TTS は **Interactions API** (`client.interactions.create`) を使用。SDK が未対応の場合は REST (`/v1beta/interactions`) にフォールバックします。
 - 画像の `response_format.mime_type` は現在 `image/jpeg` のみ対応。
-- 動画は `generate_videos` の長時間オペレーションをジョブID方式でポーリングします。生成済み動画はサーバー側に2日間保持され、その間「延長」に使えます。
+- 動画は Interactions API（`gemini-omni-1.1-flash`）をバックグラウンドスレッドで呼び、ジョブID方式でポーリングします。長さは3〜10秒、料金は秒数に比例します（720p で約 $0.10/秒、無料枠なし）。「延長」は `previous_interaction_id` で直前の生成を引き継ぎます（ジョブ情報はメモリ上に6時間保持し、コンテナを再起動すると消えます）。
 - 環境変数 `GEMINI_TEXT_MODEL` でプロンプト整形用テキストモデルを変更できます（既定 `gemini-3.6-flash`、404 時は `gemini-2.5-flash` 等へフォールバック）。
 
 ### GPT画像 / PPTX スライド再作成

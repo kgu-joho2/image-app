@@ -1,10 +1,12 @@
-/* 動画生成ページ — /api/video/jobs (Veo 3.1, ジョブID方式) */
+/* 動画生成ページ — /api/video/jobs (Gemini Omni Flash, ジョブID方式) */
 (function () {
   const $ = (id) => document.getElementById(id);
   const promptEl = $("prompt"), genBtn = $("generate"), progressCard = $("progress-card"), progressText = $("progress-text"),
     resultCard = $("result-card"), resultVideo = $("result-video");
 
   const MAX_REFS = 3;
+  // 料金の目安（USD/秒）。出力 $17.50/100万トークン × 720p: 5,792 トークン/秒（公式）, 360p: 1,931 トークン/秒（2026-10-30 実測）
+  const USD_PER_SEC = { "360p": 0.034, "720p": 0.101 };
   let first = null, last = null, refs = [];
   let lastJob = null;     // {job_id, blob, prompt}
   let polling = null, aborted = false;
@@ -18,8 +20,19 @@
     const disableAR = m === "extend";
     document.querySelectorAll('input[name="aspect"]').forEach((r) => (r.disabled = disableAR));
     $("opt-resolution").disabled = disableAR;
+    renderCost();
   }
   document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", renderMode));
+
+  function renderCost() {
+    const sec = Number($("opt-duration").value);
+    const res = mode() === "extend" && lastJob ? lastJob.options.resolution : $("opt-resolution").value;
+    const known = USD_PER_SEC[res];
+    $("cost-hint").textContent = known
+      ? `料金の目安: 約 $${(known * sec).toFixed(2)}（${res}・${sec}秒）`
+      : `料金の目安: 720p 換算で約 $${(USD_PER_SEC["720p"] * sec).toFixed(2)}（${res} の単価は未公表。実費は生成後に表示）`;
+  }
+  ["opt-duration", "opt-resolution"].forEach((id) => $(id).addEventListener("change", renderCost));
 
   // ---------- 画像入力 ----------
   function bindDrop(zoneId, fileId, onFiles) {
@@ -62,7 +75,6 @@
   // ---------- 生成 ----------
   function opts() {
     return {
-      model: document.querySelector('input[name="model"]:checked').value,
       duration_seconds: Number($("opt-duration").value),
       resolution: $("opt-resolution").value,
       aspect_ratio: document.querySelector('input[name="aspect"]:checked').value,
@@ -93,7 +105,7 @@
     const started = Date.now();
     try {
       const job = await UI.api("/api/video/jobs", { body });
-      progressText.textContent = "生成中… 通常1〜3分かかります（1080p/4Kはさらに長くなります）";
+      progressText.textContent = "生成中… 通常1〜3分かかります（長い動画・1080p/4Kはさらに長くなります）";
       const result = await poll(job.job_id, started);
       if (aborted) return;
       showResult(result, prompt, job.job_id);
@@ -133,16 +145,17 @@
     const blob = UI.dataURLToBlob(item.content, "video/mp4");
     if (resultVideo.src) URL.revokeObjectURL(resultVideo.src);
     resultVideo.src = URL.createObjectURL(blob);
-    const o = opts();
-    $("result-meta").innerHTML = `<span class="badge">${UI.escapeHtml(d.model)}</span><span class="badge">${o.duration_seconds}秒 / ${mode() === "extend" ? "720p" : o.resolution} / ${o.aspect_ratio}</span><span class="badge">${UI.fmtTime(d.elapsed || 0)}</span>`;
+    const o = d.options || opts();
+    const cost = d.usage && d.usage.cost_usd != null ? `<span class="badge" title="入力 ${d.usage.input_tokens} / 出力 ${d.usage.output_tokens} トークン">約 $${d.usage.cost_usd.toFixed(2)}</span>` : "";
+    $("result-meta").innerHTML = `<span class="badge">${UI.escapeHtml(d.model)}</span><span class="badge">${mode() === "extend" ? `+${o.duration_seconds}秒（延長）` : `${o.duration_seconds}秒`} / ${o.resolution} / ${o.aspect_ratio}</span><span class="badge">${UI.fmtTime(d.elapsed || 0)}</span>${cost}`;
     $("result-prompt").textContent = d.prompt_used || prompt;
     resultCard.style.display = "block";
     resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
-    lastJob = { job_id: jobId, blob, prompt };
+    lastJob = { job_id: jobId, blob, prompt, options: o };
     $("mode-extend").disabled = false;
     const te = $("thumb-extend");
     te.innerHTML = `<div class="thumb"><video src="${resultVideo.src}" muted></video></div>`;
-    History.add({ type: "video", blob, mime: blob.type, prompt, meta: { model: d.model, ...o, prompt_used: d.prompt_used } });
+    History.add({ type: "video", blob, mime: blob.type, prompt, meta: { model: d.model, ...o, prompt_used: d.prompt_used, cost_usd: d.usage && d.usage.cost_usd } });
   }
 
   $("act-download").addEventListener("click", () => lastJob && UI.download(lastJob.blob, `video_${UI.stamp()}.mp4`));

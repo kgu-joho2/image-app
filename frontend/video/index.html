@@ -12,7 +12,7 @@
     <main class="page">
       <div class="page-head">
         <h1>🎬 動画生成</h1>
-        <p>Veo 3.1 でテキスト・画像から音声付き動画を生成。最初と最後のフレーム指定、参照画像、動画の延長に対応。</p>
+        <p>Gemini Omni Flash でテキスト・画像から音声付き動画を生成。最初と最後のフレーム指定、参照画像、動画の延長に対応。</p>
       </div>
 
       <div class="layout">
@@ -20,27 +20,21 @@
           <section class="card">
             <h3>⚙️ 生成設定</h3>
             <div class="stack">
-              <div class="field">
-                <label>モデル</label>
-                <div class="segmented">
-                  <label><input type="radio" name="model" value="fast" checked />Fast</label>
-                  <label><input type="radio" name="model" value="standard" />標準</label>
-                  <label><input type="radio" name="model" value="lite" />Lite</label>
-                </div>
-                <div class="hint">Fast: 速い / 標準: 高品質 / Lite: 低コスト</div>
-              </div>
               <div class="grid-2">
                 <div class="field">
                   <label>長さ</label>
                   <select id="opt-duration">
-                    <option value="4">4秒</option>
+                    <option value="3">3秒</option>
+                    <option value="4" selected>4秒</option>
                     <option value="6">6秒</option>
-                    <option value="8" selected>8秒</option>
+                    <option value="8">8秒</option>
+                    <option value="10">10秒</option>
                   </select>
                 </div>
                 <div class="field">
                   <label>解像度</label>
                   <select id="opt-resolution">
+                    <option value="360p">360p（格安）</option>
                     <option value="720p" selected>720p</option>
                     <option value="1080p">1080p</option>
                     <option value="4k">4K</option>
@@ -58,7 +52,8 @@
                 <label>ネガティブプロンプト（避けたい要素）</label>
                 <input type="text" id="opt-negative" placeholder="例: 文字, ぼやけ, 低画質" />
               </div>
-              <p class="hint">Veo 3.1 は音声付きで生成されます（Developer API では音声のON/OFF指定は不可）。</p>
+              <div class="hint" id="cost-hint"></div>
+              <p class="hint">料金は動画の長さに比例します（720p 約 $0.10/秒、360p 約 $0.034/秒）。まず 360p・短い秒数で内容を確かめてから 720p で作るのがおすすめです。音声付きで生成されます。</p>
               <label class="check"><input type="checkbox" id="opt-enhance" checked /><span>日本語プロンプトを英語に整形（Gemini）</span></label>
             </div>
           </section>
@@ -98,7 +93,7 @@
               </div>
             </div>
             <div class="mode-panel" data-mode="extend">
-              <p class="hint">直前に生成した動画の続きを生成します（720p固定）。</p>
+              <p class="hint">直前に生成した動画の続きを生成します（縦横比・解像度は元の動画と同じ。元の動画＋続きが1本になって返り、料金は追加した秒数分のみ。合計40秒まで）。</p>
               <div class="thumbs" id="thumb-extend"></div>
             </div>
 
