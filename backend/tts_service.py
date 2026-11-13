@@ -19,10 +19,13 @@ import time
 from gemini_client import generate_text, interactions_create
 
 # https://ai.google.dev/gemini-api/docs/speech-generation
-# turn_annotations: 2話者会話はセリフごとに speech_metadata.speaker の指定が必須（Interactions API で呼ぶ）
+# speech_metadata: テキストパートに speaker / style を付けられるモデル。
+#   2話者会話はセリフごとに speaker の指定が必須（Interactions API で呼ぶ）。
+#   スタイルは style に渡す（本文に混ぜると指示文まで読み上げられることがある）。
+#   非対応モデル（3.1）に speech_metadata を送ると 400 になる。
 TTS_MODELS = {
-    "flash-lite-3.8": {"id": "gemini-3.8-flash-lite-tts",    "label": "Gemini 3.8 Flash-Lite TTS (高速・低コスト)", "turn_annotations": True},
-    "flash-3.8":      {"id": "gemini-3.8-flash-tts",         "label": "Gemini 3.8 Flash TTS (高品質)", "turn_annotations": True},
+    "flash-lite-3.8": {"id": "gemini-3.8-flash-lite-tts",    "label": "Gemini 3.8 Flash-Lite TTS (高速・低コスト)", "speech_metadata": True},
+    "flash-3.8":      {"id": "gemini-3.8-flash-tts",         "label": "Gemini 3.8 Flash TTS (高品質)", "speech_metadata": True},
     "flash-3.1":      {"id": "gemini-3.1-flash-tts-preview", "label": "Gemini 3.1 Flash TTS (プレビュー)"},
 }
 DEFAULT_TTS_MODEL = "flash-lite-3.8"
@@ -78,6 +81,14 @@ STYLE_TAGS = [
     {"tag": "[very slow]", "label": "とてもゆっくり"},
     {"tag": "[fast]", "label": "早口で"},
 ]
+
+def to_wav(data: bytes) -> bytes:
+    """
+    TTS 応答の音声を WAV にする。
+    3.8 系は WAV（data チャンクの後ろに C2PA チャンク付き）で返すのでそのまま使う。
+    これを生 PCM とみなしてヘッダを被せると、ヘッダや C2PA のバイト列が末尾の雑音として再生される。
+    """
+    return data if data[:4] == b"RIFF" else wave_file(data)
 
 def wave_file(pcm_data, channels=1, rate=24000, sample_width=2):
     """
@@ -394,8 +405,8 @@ class TTSService:
         return TTS_MODELS.get(model_key or DEFAULT_TTS_MODEL, TTS_MODELS[DEFAULT_TTS_MODEL])["id"]
 
     @staticmethod
-    def _needs_turn_annotations(model_id: str) -> bool:
-        return any(m["id"] == model_id and m.get("turn_annotations") for m in TTS_MODELS.values())
+    def _supports_speech_metadata(model_id: str) -> bool:
+        return any(m["id"] == model_id and m.get("speech_metadata") for m in TTS_MODELS.values())
 
     @staticmethod
     def _retry_once(call):
@@ -410,18 +421,18 @@ class TTSService:
                 return call()
             raise
 
-    def _call_tts(self, model_id: str, prompt: str, speech_config: types.SpeechConfig) -> Optional[bytes]:
+    def _call_tts(self, model_id: str, contents, speech_config: types.SpeechConfig) -> Optional[bytes]:
         """generate_content で音声を生成し、WAV バイト列を返す。"""
         cfg = types.GenerateContentConfig(response_modalities=["AUDIO"], speech_config=speech_config)
         response = self._retry_once(
-            lambda: self.client.models.generate_content(model=model_id, contents=prompt, config=cfg))
+            lambda: self.client.models.generate_content(model=model_id, contents=contents, config=cfg))
         if response and getattr(response, "candidates", None):
             cand = response.candidates[0]
             parts = getattr(getattr(cand, "content", None), "parts", None) or []
             for part in parts:
                 inline = getattr(part, "inline_data", None)
                 if inline is not None and getattr(inline, "data", None):
-                    return wave_file(inline.data)
+                    return to_wav(inline.data)
                 if getattr(part, "text", None):
                     print(f"TTS: 音声ではなくテキストが返却されました: {part.text[:200]}")
         return None
@@ -453,7 +464,7 @@ class TTSService:
             return None
         audio = result["audios"][0]
         data = base64.b64decode(audio["data"])
-        return data if "wav" in (audio.get("mime_type") or "") else wave_file(data)
+        return to_wav(data)
 
     @staticmethod
     def _split_turns(speaker_text: str, names: list) -> list:
@@ -477,6 +488,16 @@ class TTSService:
         return [(n, t) for n, t in turns if t]
 
     @staticmethod
+    def _directed_prompt(notes: str, transcript: str) -> str:
+        """
+        speech_metadata 非対応モデル向け。指示と読み上げ本文を見出しで分け、指示文が読まれないようにする。
+        https://ai.google.dev/gemini-api/docs/speech-generation#prompting-guide
+        """
+        if not notes:
+            return transcript
+        return f"### DIRECTOR'S NOTES\n{notes}\n\n#### TRANSCRIPT\n{transcript}"
+
+    @staticmethod
     def _voice(name: str) -> types.VoiceConfig:
         return types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=name))
 
@@ -494,13 +515,14 @@ class TTSService:
             model_id = self._resolve_model(model_key)
             print(f"TTS生成開始: model={model_id}, speaker_mode={speaker_mode}, voice_settings={voice_settings}")
 
-            style_line = f"音声スタイル: {style}\n\n" if style else ""
+            style_parts = [style.strip()] if style and style.strip() else []
             if rate and abs(float(rate) - 1.0) > 0.05:
-                style_line += f"話す速さ: 通常の{float(rate):.2f}倍\n\n"
+                style_parts.append(f"話す速さは通常の{float(rate):.2f}倍")
+            style_text = "、".join(style_parts)
 
             if speaker_mode == "single":
                 voice_name = voice_settings.get("voice", "Kore")
-                prompt = f"{style_line}{text}"
+                prompt = self._directed_prompt(style_text, text)
                 speech_config = types.SpeechConfig(voice_config=self._voice(voice_name))
             else:
                 voice_a = voice_settings.get("voiceA", "Kore")
@@ -516,9 +538,9 @@ class TTSService:
                     )
                 # 旧形式（話者A/話者B）で書かれていても指定名に置換
                 speaker_text = speaker_text.replace("話者A:", f"{name_a}:").replace("話者B:", f"{name_b}:")
-                prompt = f"{style_line}以下の会話を{name_a}と{name_b}の2人の話者で読み上げてください:\n{speaker_text}"
+                notes = f"{name_a}と{name_b}の2人の会話。" + (f"スタイル: {style_text}" if style_text else "")
+                prompt = self._directed_prompt(notes, speaker_text)
                 turns = self._split_turns(speaker_text, [name_a, name_b])
-                turn_style = style_line.replace("\n\n", " ").strip()
                 speech_config = types.SpeechConfig(
                     multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
                         speaker_voice_configs=[
@@ -529,9 +551,12 @@ class TTSService:
                 )
 
             def synthesize(mid: str) -> Optional[bytes]:
-                if speaker_mode != "single" and self._needs_turn_annotations(mid):
-                    return self._call_tts_turns(mid, turns, {name_a: voice_a, name_b: voice_b}, turn_style)
-                return self._call_tts(mid, prompt, speech_config)
+                if not self._supports_speech_metadata(mid):
+                    return self._call_tts(mid, prompt, speech_config)
+                if speaker_mode != "single":
+                    return self._call_tts_turns(mid, turns, {name_a: voice_a, name_b: voice_b}, style_text)
+                part = types.Part(text=text, speech_metadata=types.SpeechMetadata(style=style_text) if style_text else None)
+                return self._call_tts(mid, [types.Content(role="user", parts=[part])], speech_config)
 
             try:
                 wav = synthesize(model_id)
