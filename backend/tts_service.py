@@ -421,11 +421,11 @@ class TTSService:
                 return call()
             raise
 
-    def _call_tts(self, model_id: str, contents, speech_config: types.SpeechConfig) -> Optional[bytes]:
+    def _call_tts(self, model_id: str, prompt: str, speech_config: types.SpeechConfig) -> Optional[bytes]:
         """generate_content で音声を生成し、WAV バイト列を返す。"""
         cfg = types.GenerateContentConfig(response_modalities=["AUDIO"], speech_config=speech_config)
         response = self._retry_once(
-            lambda: self.client.models.generate_content(model=model_id, contents=contents, config=cfg))
+            lambda: self.client.models.generate_content(model=model_id, contents=prompt, config=cfg))
         if response and getattr(response, "candidates", None):
             cand = response.candidates[0]
             parts = getattr(getattr(cand, "content", None), "parts", None) or []
@@ -439,23 +439,29 @@ class TTSService:
 
     def _call_tts_turns(self, model_id: str, turns: list, speakers: Dict[str, str], style: str) -> Optional[bytes]:
         """
-        Interactions API で2話者会話を生成し、WAV バイト列を返す。
+        Interactions API で音声を生成し、WAV バイト列を返す（speech_metadata 対応モデル用）。
         turns: [(話者名, セリフ)], speakers: {話者名: 音声名}
-        google-genai < 2.25 は speech_metadata を正しく送れないため REST で呼ぶ。
+        1話者は話者名を None にする（例: turns=[(None, 本文)], speakers={None: "Kore"}）。
+        古い google-genai は speech_metadata を送れない（types.SpeechMetadata が無い）ため REST で呼ぶ。
         """
         content = []
         for speaker, line in turns:
-            meta = {"type": "speech_metadata", "speaker": speaker}
+            meta = {"type": "speech_metadata"}
+            if speaker:
+                meta["speaker"] = speaker
             if style:
                 meta["style"] = style
-            content.append({"type": "text", "text": line, "annotations": [meta]})
+            item = {"type": "text", "text": line}
+            if len(meta) > 1:
+                item["annotations"] = [meta]
+            content.append(item)
         result = self._retry_once(lambda: interactions_create(
             model_id,
             [{"type": "user_input", "content": content}],
             rest=True,
             response_format={"type": "audio"},
             generation_config={"speech_config": {
-                "speakers": [{"speaker": s, "voice": v} for s, v in speakers.items()],
+                "speakers": [{"speaker": s, "voice": v} if s else {"voice": v} for s, v in speakers.items()],
             }},
         ))
         if not result["audios"]:
@@ -553,10 +559,9 @@ class TTSService:
             def synthesize(mid: str) -> Optional[bytes]:
                 if not self._supports_speech_metadata(mid):
                     return self._call_tts(mid, prompt, speech_config)
-                if speaker_mode != "single":
-                    return self._call_tts_turns(mid, turns, {name_a: voice_a, name_b: voice_b}, style_text)
-                part = types.Part(text=text, speech_metadata=types.SpeechMetadata(style=style_text) if style_text else None)
-                return self._call_tts(mid, [types.Content(role="user", parts=[part])], speech_config)
+                if speaker_mode == "single":
+                    return self._call_tts_turns(mid, [(None, text)], {None: voice_name}, style_text)
+                return self._call_tts_turns(mid, turns, {name_a: voice_a, name_b: voice_b}, style_text)
 
             try:
                 wav = synthesize(model_id)
